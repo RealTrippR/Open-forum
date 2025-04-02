@@ -1,0 +1,2 @@
+How to install mysql:
+https://www.youtube.com/watch?v=u96rVINbAUI

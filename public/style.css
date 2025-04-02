@@ -1,0 +1,136 @@
+:root {
+    --mainTextColor: #e5e2d9;
+    --backgroundColor: rgb(127, 147, 127);
+    --navBarColor:  color-mix(in srgb, var(--backgroundColor) 90%, black);
+    --stdHeaderFontFamily:"Times New Roman", Georgia, serif;
+    --stdMinorFontFamily:"Verdana",Geneva,sans-serif; ;
+    /*--stdShadowOffset:  2px 2px 0px rgba(0, 0, 0, 1). /* Horizontal, Vertical, Blur, Color */
+    --stdShadow: 
+        .3px .3px 0px rgba(0, 0, 0, 1),
+        .6px .6px 0px rgba(0, 0, 0, 1),  
+        .9px .9px 0px rgba(0, 0, 0, 1),
+        1.2px 1.2px 0px rgba(0, 0, 0, 1),
+        1.5px 1.5px 0px rgba(0, 0, 0, 1), 
+        1.8px 1.8px 0px rgba(0, 0, 0, 1), 
+        2.1px 2.1px 0px rgba(0, 0, 0, 1), 
+        2.4px 2.4px 0px rgba(0, 0, 0, 1), 
+        2.7px 2.7px 0px rgba(0, 0, 0, 1);
+
+    --stdMinorShadow: 
+        .3px .3px 0px rgba(0, 0, 0, 1),
+        .6px .6px 0px rgba(0, 0, 0, 1),  
+        .9px .9px 0px rgba(0, 0, 0, 1),
+        1.2px 1.2px 0px rgba(0, 0, 0, 1),
+        1.5px 1.5px 0px rgba(0, 0, 0, 1),
+        1.8px 1.8px 0px rgba(0, 0, 0, 1);
+
+    --stdInsetMinorShadow: 
+        inset .3px .3px 0px rgba(0, 0, 0, 1),
+        inset .6px .6px 0px rgba(0, 0, 0, 1),  
+        inset .9px .9px 0px rgba(0, 0, 0, 1),
+        inset 1.2px 1.2px 0px rgba(0, 0, 0, 1);
+    }
+
+body {
+    background-color: var(--backgroundColor);
+     /*remove default padding*/
+    margin: 0;
+    padding: 0;
+}
+
+/*--------------------------------------------*/
+/*NAVBAR*/
+
+.navbarUL {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    background-color: var(--navBarColor);
+    /*background-color: rgb(118, 137, 118);  Background color */
+    overflow: hidden;
+    display: flex; /* makes it horizontal */
+    width: 100%;
+    border-bottom: 1.5px solid black;
+
+}
+
+.navbarUL li {
+    display: inline;
+    padding: 0px;
+}
+
+.navbarUL li a {
+    font-size: 22px;
+    display: block;
+    color: var(--mainTextColor);
+    text-decoration: none;
+    font-family: var(--stdHeaderFontFamily);
+    font-weight: 900 ;
+    text-shadow:  var(--stdShadow);
+    padding:10px 17px;
+    transition: transform 0.19s ease; 
+}
+
+.navbarUL li a:hover {
+    background-color: rgb(105, 123, 106);
+    transform: scale(1.1);
+    filter: blur(0);
+}
+
+/*--------------------------------------------*/
+/*CHANNEL BAR*/
+
+.channelBarUL {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    background-color: var(--backgroundColor);
+
+    border : 1px solid black;
+    border-top: 0px;
+
+    width: 150px;
+}
+
+
+li.channelBarHeader {
+    border : 1px solid black;
+}
+
+li.channelBarHeader p {
+    margin : 1px;
+    padding-top:0;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 18px;
+    transition: transform 0.05s ease; 
+}
+li.channelBarHandleButton {
+    border : 1px solid black;
+
+    padding: 1px;
+    background-color: var(--backgroundColor);
+}
+
+li.channelBarHandleButton:hover {
+    box-shadow: var(--stdInsetMinorShadow);
+    background-color: var(--navBarColor);
+}
+
+li.channelBarHandleButton p {
+    margin : 1px;
+    padding-top:0;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-size: 18px;
+}
+
+li.channelBarHandleButton p:hover{
+    transform: translate(1px, 1px);
+}
+
+/*--------------------------------------------*/
+/*GENERAL*/

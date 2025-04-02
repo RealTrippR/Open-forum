@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head> 
+    <meta charset="UTF-8">
+    <title> OpenForum </title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="navbar"> </div>
+<div id="channelBar"> </div>
+
+
+<script src="loadNavbar.js"> </script>
+<script src="loadChannelBar.js"> </script>
+
+<script>
+    window.onload = function() {
+        loadNavbar();
+        // it's weird, but it works - don't touch it!
+        let _channels = <%- JSON.stringify(channels) %>
+        window.channels = JSON.parse(_channels);
+        //window.channels = getTest;  // Converts to a valid JS object
+        //window.channels = JSON.parse('[{"id":1,"name":"Test Channel","topicListID":0}]' );
+        loadChannelBar();
+
+        console.log("Page has fully loaded");
+        // Your code to execute after the page is loaded
+    };
+</script>
+</body>
