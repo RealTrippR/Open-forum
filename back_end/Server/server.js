@@ -26,6 +26,7 @@ const dbPool =  mysql.createPool({
 }).promise()
 
 await dbUtils.initDB(dbPool)
+await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
 import router from '../Routers/router.js'
 await router.init(app,dbPool);

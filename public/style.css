@@ -65,9 +65,9 @@ body {
     color: var(--mainTextColor);
     text-decoration: none;
     font-family: var(--stdHeaderFontFamily);
-    font-weight: 900 ;
+    font-weight: 900;
     text-shadow:  var(--stdShadow);
-    padding:10px 17px;
+    padding: 10px 17px;
     transition: transform 0.19s ease; 
 }
 
@@ -78,39 +78,37 @@ body {
 }
 
 /*--------------------------------------------*/
-/*CHANNEL BAR*/
+/*CHANNEL BAR*/ 
 
 .channelBarUL {
     list-style-type: none;
     margin: 0;
     padding: 0;
     background-color: var(--backgroundColor);
-
     border : 1px solid black;
     border-top: 0px;
-
     width: 150px;
 }
-
 
 li.channelBarHeader {
     border : 1px solid black;
 }
 
 li.channelBarHeader p {
-    margin : 1px;
+    margin: 1px;
+    text-align: center;
     padding-top:0;
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
     text-decoration: none;
     font-weight: 600;
-    font-size: 18px;
+    font-size: 22px;
     transition: transform 0.05s ease; 
 }
-li.channelBarHandleButton {
-    border : 1px solid black;
 
-    padding: 1px;
+li.channelBarHandleButton {
+    text-align: center;
+    border : 1px solid black;
     background-color: var(--backgroundColor);
 }
 
@@ -125,11 +123,42 @@ li.channelBarHandleButton p {
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
     text-decoration: none;
-    font-size: 18px;
+    font-size: 19px;
+    font-weight: 500;
 }
 
 li.channelBarHandleButton p:hover{
     transform: translate(1px, 1px);
+}
+
+.channelThreadsHolder {
+    position: absolute;
+    top: 46px;
+    margin-left: 150px;
+    width: 100%; 
+    min-width: 150px;
+    background-color: var(--backgroundColor);
+    border: 1px solid black;
+    padding: 0px;
+}
+
+/*--------------------------------------------*/
+/*Thread headers*/
+.threadHeaderHolder {
+    border : 1px solid black;
+    margin: 0px;
+    padding: 0px;
+}
+
+.threadHeaderTitle {
+    padding: 1px;
+    margin: 3px;
+    padding-left: 5px;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-size: 22px;
+    font-weight: 600;
 }
 
 /*--------------------------------------------*/

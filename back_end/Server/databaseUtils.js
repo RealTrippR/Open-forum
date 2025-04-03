@@ -31,6 +31,24 @@ async function initDB(dbPool) {
     }
 }
 
+async function initChannels(dbPool) {
+    if (dbPool === undefined) {
+        throw new Error('dbPool is required as an argument');
+    }
+    try {
+        if (await getChannelCount(dbPool)===0) {
+            await createChannel(dbPool, "General")
+            await createChannel(dbPool, "Help")
+            await createChannel(dbPool, "Development");
+            await createChannel(dbPool, "Feature Requests")
+            await createChannel(dbPool, "Bug Reports")
+            await createChannel(dbPool, "Showcase")
+        }
+    } catch(err) {
+        console.log("Failed to initialize channels: ", err);
+    }
+}
+
 async function clearDB(dbPool)
 {
     if (dbPool === undefined) {
@@ -53,16 +71,18 @@ async function clearDB(dbPool)
 
 }
 
-async function updateChannelName(channelId, newName){/*TODO*/}
+async function getChannelCount(dbPool) {
+
+    let c = await getChannels(dbPool);
+    return c.length;
+}
 
 // returns the channel id if successful, otherwise returns undefined
 async function createChannel(dbPool, name) {
-    if (dbPool === undefined) {
-        throw new Error('dbPool is required as an argument');
-    }
+    if (dbPool === undefined) {throw new Error('dbPool is required as an argument');}
 
     const topicListChannelId = 0; //temp, replace with actual value
-    const createChannelQuery = `INSERT INTO ${process.env.MYSQL_CHANNEL_TABLE} (name, topicListID) VALUES (?, ?)`;
+    const createChannelQuery = `INSERT INTO ${process.env.MYSQL_CHANNEL_TABLE} (name, threadListID) VALUES (?, ?)`;
 
     const [result] = await dbPool.execute(createChannelQuery, [name, topicListChannelId]);
     console.log("Created channel successfully");
@@ -157,5 +177,5 @@ function checkIfUserExists() {
 
 }
 
-export default {initDB,createUser, checkIfUserExists, createChannel, getChannels, addThreadToChannel,clearDB,getThreadsFromChannel};
+export default {initDB, initChannels, getChannelCount, createUser, checkIfUserExists, createChannel, getChannels, addThreadToChannel,clearDB,getThreadsFromChannel};
 

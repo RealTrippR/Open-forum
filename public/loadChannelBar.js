@@ -46,5 +46,6 @@ function loadChannelBar() {
         )
         const data = await res.json();
         console.log('Response from server:', data);  // This will show the response from the backend
+        loadThreads(data.threads);
     }
 }

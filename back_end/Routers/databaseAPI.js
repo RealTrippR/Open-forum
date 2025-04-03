@@ -16,14 +16,29 @@ async function init(app, _dbPool) {
     // threadAPI
     app.post('/channel', async (req, res) => {
         try {
-            const { channelID } = req.body;
+            let { channelID } = req.body;
+            channelID = Number(channelID);
+            if(typeof channelID !== "number") {
+                throw new Error("channelID is not a number!");
+            };
             const threads = await dbUtils.getThreadsFromChannel(dbPool,channelID);
             res.status(200).json({threads: threads});
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ msg: "Salvete, Huzzi!", channelId: channelId });
+        } catch (err) {
+            //console.error(err);
+            res.status(500);
         }
     });
+
+    
+    // return the messages from the desired thread
+    app.post('/channel/threads', async (req, res) => {
+        try {
+            
+        } catch (err) {
+            //console.error(error);
+            res.status(500);
+        }
+    })
 }
 
 
