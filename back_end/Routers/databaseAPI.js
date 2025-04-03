@@ -39,6 +39,10 @@ async function init(app, _dbPool) {
             res.status(500);
         }
     })
+
+    app.post('channel/message', async (req, res) => {
+
+    });
 }
 
 

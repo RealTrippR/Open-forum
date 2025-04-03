@@ -25,11 +25,12 @@ const dbPool =  mysql.createPool({
     database: process.env.MYSQL_DATABASE
 }).promise()
 
+await dbUtils.clearDB(dbPool);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
 import router from '../Routers/router.js'
-await router.init(app,dbPool);
+await router.init(app,dbPool, passport);
 import dbAPI from '../Routers/databaseAPI.js'
 await dbAPI.init(app,dbPool)
 

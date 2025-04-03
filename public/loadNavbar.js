@@ -7,6 +7,7 @@ function loadNavbar() {
         <li><a href="/">HOME</a></li>
         <li><a href="search.ejs">SEARCH</a></li>
         <li><a href="contacts.html">CONTACT</a></li>
+        <li><a href="Login">LOGIN</a></li>
     </ul>
     </BODY>
     `;

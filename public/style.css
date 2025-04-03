@@ -102,8 +102,7 @@ li.channelBarHeader p {
     text-shadow: var(--stdMinorShadow);
     text-decoration: none;
     font-weight: 600;
-    font-size: 22px;
-    transition: transform 0.05s ease; 
+    font-size: 20px;
 }
 
 li.channelBarHandleButton {
@@ -118,7 +117,7 @@ li.channelBarHandleButton:hover {
 }
 
 li.channelBarHandleButton p {
-    margin : 1px;
+    margin : 2.5px;
     padding-top:0;
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
@@ -159,6 +158,20 @@ li.channelBarHandleButton p:hover{
     text-decoration: none;
     font-size: 22px;
     font-weight: 600;
+}
+
+/*--------------------------------------------*/
+/*USER ACCOUNT MANAGEMENT*/
+.userLoginButton {
+
+}
+
+.userNavbarButton {
+    
+}
+
+.userProfileImage {
+
 }
 
 /*--------------------------------------------*/
