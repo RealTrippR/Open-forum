@@ -57,13 +57,18 @@ async function init(app, _dbPool, _passport) {
 
     app.post('/login',(req,res,next) => {
         console.log("Recieved login request");
-        checkNotAuthenticated(req,res,next);
+        returnToHomepageIfAuthenticated(req,res,next);
     },
     passport.authenticate('local', {
         successRedirect: '/',
         failureRedirect: '/login',
         failureFlash: true
     }));
+
+    app.get('/register', returnToHomepageIfAuthenticated, (req, res)  =>  {
+        res.render('register.ejs');
+        return;
+    });
 
     app.get('/users/:username', (req,res,next) => {
         const { username } = req.params;
@@ -81,6 +86,17 @@ async function init(app, _dbPool, _passport) {
             res.status(500);
         }
     });
+}
+
+function returnToHomepageIfAuthenticated (req,res,next) {
+    try {
+        if (req.isAuthenticated()) {
+            return res.redirect('/');
+        }
+        next();
+    } catch {
+        next();
+    }
 }
 /*
 function checkAuthenticated(req, res, next) {
