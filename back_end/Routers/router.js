@@ -22,7 +22,9 @@ async function init(app, _dbPool, _passport) {
     app.engine('html', ejs.renderFile)
     app.use(express.static('public'));  // Ensure that static files are inside a "public" folder
     app.use(express.json());
+    
     // init passport
+    app.use(express.urlencoded({extended: false}))
     app.use(flash())
     app.use(session({
         secret: process.env.SESSION_SECRET,
@@ -62,22 +64,47 @@ async function init(app, _dbPool, _passport) {
         failureRedirect: '/login',
         failureFlash: true
     }));
-}
-    
-function checkAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
-        return next();
-    }
 
-    // they are not logged in yet, send them to the login page
-    res.redirect('/login');
+    app.get('/users/:username', (req,res,next) => {
+        const { username } = req.params;
+        console.log("Attempted to get user with username: ", username)
+        
+        try {
+            const authenticated = req.isAuthenticated();
+            if (authenticated) {
+                
+            } else {
+                res.render('publicUserProfile');
+            }
+            //res.
+        } catch (err) {
+            res.status(500);
+        }
+    });
+}
+/*
+function checkAuthenticated(req, res, next) {
+    try {
+        if (req.isAuthenticated()) {
+            return next();
+        }
+        res.redirect('/login');
+    } catch {
+        // they are not logged in yet, send them to the login page
+        res.redirect('/login');
+    }
 }
 
 function checkNotAuthenticated(req,res,next) {
-    if (req.isAuthenticated()) {
-       return res.redirect('/');
+    try {
+        if (req.isAuthenticated()) {
+        return res.redirect('/');
+        }
+        next();
+    } catch {
+        next();
     }
-    next();
 }
+*/
 
 export default {init}

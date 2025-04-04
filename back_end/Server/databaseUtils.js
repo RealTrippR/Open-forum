@@ -13,9 +13,10 @@ async function initDB(dbPool) {
         const USERcreateTableQuery = `
         CREATE TABLE IF NOT EXISTS ${process.env.MYSQL_USER_TABLE} (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL,
-            password VARCHAR(255) NOT NULL,
+            username VARCHAR(64) NOT NULL,
+            email VARCHAR(128) NOT NULL,
+            password VARCHAR(128) NOT NULL,
+            description VARCHAR(128) NOT NULL,
             registerDate DATETIME NOT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
@@ -167,7 +168,14 @@ async function getChannels(dbPool) {
     }
 }
 
-
+const validateEmail = (email) => {
+    return String(email)
+      .toLowerCase()
+      .match(
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+      );
+  };
+  
 async function isEmailInUse(dbPool, email) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
@@ -241,21 +249,29 @@ async function getUserFromID(dbPool, ID) {
 }
 
 // returns the ID of the created user, returns undefined if it fails to get user or if the user already exists
-async function registerUser(dbPool, username, plainPassword) {
+async function registerUser(dbPool, email, username, plainPassword) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
     }
+    if (username == null || email == null || plainPassword == null) {
+        return "Enter valid data"; // invalid data passed into function
+    }
+    if(validateEmail(email)){ 
+        return "Invalid Email"
+    }
     if (getUserIDfromUsername(username) !== undefined) {
-        return "User Exists";
+        return "Username is taken";
     }
     try {
-        const saltRounds = 12;
-        const hashedPassword = await bcrypt.hash(plainPassword, saltRounds);
+        const hashedPassword = await bcrypt.hash(plainPassword, process.saltRounds);
 
-        const query = `INSERT INTO ${process.env.MYSQL_USER_TABLE} (username, password) VALUES (?, ?)`;
+        const query = `INSERT INTO ${process.env.MYSQL_USER_TABLE} (username, email, password, registerDate) VALUES (?, ?, ?, ?)`;
             console.log(query);
 
-       const [result] = await dbPool.execute(query, [username, hashedPassword]);
+        const now = new Date();
+        const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
+
+       const [result] = await dbPool.execute(query, [username, email, hashedPassword, datetime]);
 
        console.log("User registered successfully");
        return result.insertId;

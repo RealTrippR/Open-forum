@@ -1,6 +1,6 @@
 import '../../env.js'
 const PORT = process.env.SERVER_PORT;
-
+process.saltRounds = 13
 import express from 'express'
 const app = express();
 import bcrypt from 'bcrypt';
