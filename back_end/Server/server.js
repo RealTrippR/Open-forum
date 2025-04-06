@@ -6,14 +6,6 @@ const app = express();
 import bcrypt from 'bcrypt';
 import passport from 'passport';
 
-// init passport system
-import initializePassport from './passport-config.js'
-initializePassport.initialize(
-    passport,
-    email => users.find(user=>user.email === email),
-    id => users.find(user=>user.id === id)
-);
-
 
 import mysql from 'mysql2'
 import dbUtils from './databaseUtils.js'
@@ -25,6 +17,16 @@ const dbPool =  mysql.createPool({
     database: process.env.MYSQL_DATABASE
 }).promise()
 
+
+// init passport system
+import { initialize } from './passport-config.js'
+initialize(
+    dbPool,
+    passport,
+    username =>  dbUtils.doesUserExist(dbPool, username), // search for user, will not auth if undefined/null/any is returns
+    id => dbUtils.getUserFromID(dbPool,id) // search for user, will not auth if undefined/null/any is returns
+);
+
 await dbUtils.clearDB(dbPool);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
@@ -35,7 +37,9 @@ import dbAPI from '../Routers/databaseAPI.js'
 await dbAPI.init(app,dbPool)
 
 
-    
+// test user
+dbUtils.registerUser(dbPool, 'w@w', 'w', "w");
+const tmp = dbUtils.getUserFromID(dbPool,1);
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);

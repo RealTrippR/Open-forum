@@ -39,14 +39,14 @@ async function init(app, _dbPool, _passport) {
         try {
             const channels = await dbUtils.getChannels(dbPool);
             console.log(JSON.stringify(channels) );
-            res.render('index.ejs', { channels: JSON.stringify(channels) })
+            res.render('index.ejs', { channels: JSON.stringify(channels), debugINFO: JSON.stringify(req.isAuthenticated()) })
         } catch (err) {
             console.error(err);
             res.status(500);
         }
     });
 
-    app.get('/login', async (req, res) => {
+    app.get('/login',returnToHomepageIfAuthenticated, async (req, res) => {
         try {
             res.render('login.ejs');
         } catch (err) {
@@ -55,10 +55,7 @@ async function init(app, _dbPool, _passport) {
         }
     })
 
-    app.post('/login',(req,res,next) => {
-        console.log("Recieved login request");
-        returnToHomepageIfAuthenticated(req,res,next);
-    },
+    app.post('/login',
     passport.authenticate('local', {
         successRedirect: '/',
         failureRedirect: '/login',
@@ -67,8 +64,22 @@ async function init(app, _dbPool, _passport) {
 
     app.get('/register', returnToHomepageIfAuthenticated, (req, res)  =>  {
         res.render('register.ejs');
-        return;
     });
+
+    app.post('/register', returnToHomepageIfAuthenticated, async (req,res) => {
+        try {
+            const registerRES = dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
+            if (typeof(registerRES)==='string' || registerRES===undefined) { // register user will return a string if it fails
+                //res.pos // use socket to send error messages
+            }
+            console.log("Registered user: ", registerRES);
+            res.redirect('/login');
+            
+        } catch (err) {
+            res.redirect('/register');
+            console.log("Error registering user: ", err)
+        }
+    })
 
     app.get('/users/:username', (req,res,next) => {
         const { username } = req.params;
@@ -77,11 +88,10 @@ async function init(app, _dbPool, _passport) {
         try {
             const authenticated = req.isAuthenticated();
             if (authenticated) {
-                
+                res.render('privateUserPage', {username: {name: req.user.username}})
             } else {
-                res.render('publicUserProfile');
+                res.render('publicUserPage');
             }
-            //res.
         } catch (err) {
             res.status(500);
         }

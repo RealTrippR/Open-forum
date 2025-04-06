@@ -16,7 +16,7 @@ async function initDB(dbPool) {
             username VARCHAR(64) NOT NULL,
             email VARCHAR(128) NOT NULL,
             password VARCHAR(128) NOT NULL,
-            description VARCHAR(128) NOT NULL,
+            description VARCHAR(128) NOT NULL DEFAULT "",
             registerDate DATETIME NOT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
@@ -217,17 +217,20 @@ async function getUserIDfromUsername(dbPool, username) {
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`
         const {res} = await dbPool.query(query, {username});
-        if (res.length>=0) {
-            return res[0].id;
+        if (res == undefined) {
+            return undefined; // user doesn't exist
         }
         if (res.length>1) {
             console.log("Fatal error, more than two users share the same username: ", username)
             console.log("Shutting down server due to possible security vulnerability.")
             process.exit(); // nuke the server, as this could be the result of a security vulnerability
         }
+        if (res.length>=0) {
+            return res[0].id;
+        }
         
     } catch (err) {
-        console.err("Failed to get user ID from username: ", err);
+        console.error("Failed to get user ID from username: ", err);
         return undefined;
     }
     return undefined;
@@ -241,9 +244,28 @@ async function getUserFromID(dbPool, ID) {
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE id = ?`
         const {res} = dbPool.query(query, [ID]);
+        if (res === undefined) {
+            return undefined;
+        }
         return res[0];
+    } catch  (error) {
+        console.error("Could not get user from ID", error);
+    }
+    return undefined;
+}
+
+
+// returns the user object is successful, otherwise returns undefined
+async function getUserByUsername(dbPool, username) {
+    if (dbPool === undefined) {
+        throw new Error('dbPool is required as an argument');
+    }
+    try {
+        const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`;
+        const [rows] = await dbPool.query(query, [username]);
+        return rows[0]; // return the first matching user
     } catch {
-        console.log("Could not get user from ID", ID);
+        console.log("Could not get user from username", username);
     }
     return undefined;
 }
@@ -254,19 +276,19 @@ async function registerUser(dbPool, email, username, plainPassword) {
         throw new Error('dbPool is required as an argument');
     }
     if (username == null || email == null || plainPassword == null) {
-        return "Enter valid data"; // invalid data passed into function
+        return Error("Enter valid data"); // invalid data passed into function
     }
     if(validateEmail(email)){ 
         return "Invalid Email"
     }
-    if (getUserIDfromUsername(username) !== undefined) {
+    if (await getUserIDfromUsername(dbPool, username) !== undefined) {
         return "Username is taken";
     }
     try {
         const hashedPassword = await bcrypt.hash(plainPassword, process.saltRounds);
 
         const query = `INSERT INTO ${process.env.MYSQL_USER_TABLE} (username, email, password, registerDate) VALUES (?, ?, ?, ?)`;
-            console.log(query);
+        console.log(query);
 
         const now = new Date();
         const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
@@ -295,6 +317,6 @@ async function getThreadsFromChannel(dbPool, channelID) {
 
 export default {
     initDB, clearDB, initChannels, getChannelCount, registerUser, 
-    isEmailInUse, getUserIDfromUsername, getUserFromID, doesUserExist, 
+    isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
     createChannel, getChannels, addThreadToChannel, getThreadsFromChannel
 };
