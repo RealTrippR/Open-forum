@@ -27,12 +27,18 @@ function initialize(_dbPool, passport, getUserByUsername, getUserById) {
         }
     }
 
-    passport.use(new localStrategy({usernameField: 'username'},
-        authenticateUser ));
+    
+    passport.use(new localStrategy({usernameField: 'username'}, authenticateUser ));
     passport.serializeUser((user, done) =>  { done (null, user.id)} );
-    passport.deserializeUser((id, done) => {
-        return done(null, getUserById(id))
-    } );
+    passport.deserializeUser(async (id, done) => {
+        try {
+            const user = await dbUtils.getPublicUserInfo(dbPool, id);
+            // Pass the user object to done() to populate req.user
+            done(null, user);
+        } catch (err) {
+            done(err, null);
+        }
+    });
 }
 
 export  {initialize};

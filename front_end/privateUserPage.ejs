@@ -7,11 +7,15 @@
 </head>
 <body>
 <div id="navbar"> </div>
-<%= debugINFO %>
 <div id="channelBar"> </div>
     <div id="channelThreadsHolder" class="channelThreadsHolder"> </div>
 
 <script src="loadNavbar.js"> </script>
-
+<script>
+    window.onload = function() {
+        window.user = <%= user %>
+        loadNavbar();
+    };
+</script>
 </body>
 </html>

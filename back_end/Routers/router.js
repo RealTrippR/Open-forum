@@ -38,8 +38,16 @@ async function init(app, _dbPool, _passport) {
     app.get('/', async (req, res) => {
         try {
             const channels = await dbUtils.getChannels(dbPool);
-            console.log(JSON.stringify(channels) );
-            res.render('index.ejs', { channels: JSON.stringify(channels), debugINFO: JSON.stringify(req.isAuthenticated()) })
+
+            let currentUser = null;
+            if ( req.isAuthenticated() && req.user != undefined) {
+                currentUser = await dbUtils.getPublicUserInfo(dbPool, req.user.id);
+            } else {
+                currentUser=""
+            }
+            
+            res.render('index.ejs', { channels: JSON.stringify(channels), user: currentUser})
+          
         } catch (err) {
             console.error(err);
             res.status(500);
@@ -48,9 +56,12 @@ async function init(app, _dbPool, _passport) {
 
     app.get('/login',returnToHomepageIfAuthenticated, async (req, res) => {
         try {
+            if (req.isAuthenticated()) {
+                res.redirect('/');
+            }
             res.render('login.ejs');
         } catch (err) {
-            console.err(err);
+            console.error(err);
             res.status(500);
         }
     })
@@ -81,16 +92,20 @@ async function init(app, _dbPool, _passport) {
         }
     })
 
-    app.get('/users/:username', (req,res,next) => {
+    app.get('/users/:username', async (req,res,next) => {
         const { username } = req.params;
         console.log("Attempted to get user with username: ", username)
         
         try {
             const authenticated = req.isAuthenticated();
+            let currentUser = await dbUtils.getPublicUserInfo(dbPool, req.user.id);
+            if (!currentUser) {
+                currentUser=""
+            }
             if (authenticated) {
-                res.render('privateUserPage', {username: {name: req.user.username}})
+                res.render('privateUserPage', {user: currentUser});
             } else {
-                res.render('publicUserPage');
+                res.render('publicUserPage', {user: currentUser});
             }
         } catch (err) {
             res.status(500);
@@ -101,6 +116,7 @@ async function init(app, _dbPool, _passport) {
 function returnToHomepageIfAuthenticated (req,res,next) {
     try {
         if (req.isAuthenticated()) {
+            console.log(req.user);
             return res.redirect('/');
         }
         next();

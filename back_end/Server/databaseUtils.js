@@ -243,11 +243,11 @@ async function getUserFromID(dbPool, ID) {
     }
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE id = ?`
-        const {res} = dbPool.query(query, [ID]);
-        if (res === undefined) {
+        const [rows] = await dbPool.query(query, [ID]);
+        if (rows === undefined) {
             return undefined;
         }
-        return res[0];
+        return rows[0];
     } catch  (error) {
         console.error("Could not get user from ID", error);
     }
@@ -314,9 +314,28 @@ async function getThreadsFromChannel(dbPool, channelID) {
     return rows;
 }
 
+// returns a user struct without any sensitive information (i.e. no passwords)
+// returns undefined if the user does not exist
+async function getPublicUserInfo(dbPool, id) {
+    try {
+        const privateUser = await getUserFromID(dbPool, id);
+        if (privateUser == undefined) {
+            return undefined;
+        }
+        let myUser = {};
+        myUser.username = privateUser.username;
+        myUser.description = privateUser.description;
+        myUser.Date = privateUser.datetime;
+        return myUser;
+    } catch (err) {
+        console.error("Could not convert private user to public user: ", err);
+        return undefined;
+    }
+}
 
 export default {
     initDB, clearDB, initChannels, getChannelCount, registerUser, 
     isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
-    createChannel, getChannels, addThreadToChannel, getThreadsFromChannel
+    createChannel, getChannels, addThreadToChannel, getThreadsFromChannel,
+    getPublicUserInfo
 };

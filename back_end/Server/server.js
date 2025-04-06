@@ -31,6 +31,8 @@ await dbUtils.clearDB(dbPool);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
+dbUtils.registerUser(dbPool, 'w@w', 'w', "w");
+
 import router from '../Routers/router.js'
 await router.init(app,dbPool, passport);
 import dbAPI from '../Routers/databaseAPI.js'
@@ -38,7 +40,6 @@ await dbAPI.init(app,dbPool)
 
 
 // test user
-dbUtils.registerUser(dbPool, 'w@w', 'w', "w");
 const tmp = dbUtils.getUserFromID(dbPool,1);
 // Start the server
 app.listen(PORT, () => {
