@@ -3,20 +3,19 @@
 <head> 
     <meta charset="UTF-8">
     <title> OpenForum </title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div id="navbar"> </div>
 <div id="channelBar"> </div>
     <div id="channelThreadsHolder" class="channelThreadsHolder"> </div>
-<script src="loadNavbar.js"> </script>
-<script src="loadChannel.js" ></script>
-<script src="loadChannelBar.js"> </script>
-<%= user %>
+<script src="/loadNavbar.js"> </script>
+<script src="/loadChannel.js" ></script>
+<script src="/loadChannelBar.js"> </script>
 
 <script>
     window.onload = function() {
-        window.user = <%= user %>
+        window.user = <%- user %>
         loadNavbar();
         // it's weird, but it works - don't touch it!
         let _channels = <%- JSON.stringify(channels) %>

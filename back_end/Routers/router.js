@@ -3,16 +3,24 @@ import ejs from 'ejs';
 
 import dbUtils from '../Server/databaseUtils.js'
 
-import session from 'express-session'
 import flash from 'express-flash'
+import session from 'express-session'
+import expressMysqlSession from 'express-mysql-session';
 
+
+const MySQLStore = expressMysqlSession(session);
+let sessionStore = undefined
+let dbOptions = undefined;
 import express from 'express'
 const PORT = process.env.SERVER_PORT;
 
 let passport;
 let dbPool;
 
-async function init(app, _dbPool, _passport) {
+async function init(app,_dbOptions, _dbPool, _passport) {
+    dbOptions = _dbOptions;
+    sessionStore = new MySQLStore(dbOptions);
+
     dbPool = _dbPool
     passport = _passport;
     
@@ -26,10 +34,19 @@ async function init(app, _dbPool, _passport) {
     // init passport
     app.use(express.urlencoded({extended: false}))
     app.use(flash())
+    const TWO_HOURS = 1000 * 60 * 60 * 2
+    // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
     app.use(session({
+        name: process.env.SESSION_NAME,
         secret: process.env.SESSION_SECRET,
         resave: false,
-        saveUninitialized: false
+        saveUninitialized: false,
+        store: sessionStore,
+        cookie: {
+            //maxAge: TWO_HOURS,
+            sameSite: 'Lax',
+            secure: process.env.NODE_ENV === 'production' // setting secure to true breaks session functionality, but why? Also, it should be fine as long as the server is running on https
+        }
     }));
     app.use(passport.initialize());
     app.use(passport.session());
@@ -39,14 +56,13 @@ async function init(app, _dbPool, _passport) {
         try {
             const channels = await dbUtils.getChannels(dbPool);
 
-            let currentUser = null;
-            if ( req.isAuthenticated() && req.user != undefined) {
-                currentUser = await dbUtils.getPublicUserInfo(dbPool, req.user.id);
-            } else {
-                currentUser=""
+            let currentUser = "";
+            const authenticated = await req.isAuthenticated();
+            if ( authenticated && req.user != undefined) {
+                currentUser = req.user;
             }
-            
-            res.render('index.ejs', { channels: JSON.stringify(channels), user: currentUser})
+            console.log(await req.isAuthenticated());
+            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser)})
           
         } catch (err) {
             console.error(err);
@@ -66,12 +82,17 @@ async function init(app, _dbPool, _passport) {
         }
     })
 
-    app.post('/login',
-    passport.authenticate('local', {
-        successRedirect: '/',
-        failureRedirect: '/login',
-        failureFlash: true
-    }));
+    app.post('/login', (req, res, next) => {
+        passport.authenticate('local', (err, user, info) => {
+          if (err) return next(err);
+          if (!user) return res.redirect('/login');
+      
+          req.logIn(user, (err) => {
+            if (err) return next(err);
+            return res.redirect('/');
+          });
+        })(req, res, next);
+      });
 
     app.get('/register', returnToHomepageIfAuthenticated, (req, res)  =>  {
         res.render('register.ejs');
@@ -79,12 +100,14 @@ async function init(app, _dbPool, _passport) {
 
     app.post('/register', returnToHomepageIfAuthenticated, async (req,res) => {
         try {
-            const registerRES = dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
+            const registerRES = await dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
             if (typeof(registerRES)==='string' || registerRES===undefined) { // register user will return a string if it fails
+                res.redirect('/login');
                 //res.pos // use socket to send error messages
+            } else {
+                console.log("Registered user: ", registerRES);
+                res.redirect('/login');
             }
-            console.log("Registered user: ", registerRES);
-            res.redirect('/login');
             
         } catch (err) {
             res.redirect('/register');
@@ -94,21 +117,25 @@ async function init(app, _dbPool, _passport) {
 
     app.get('/users/:username', async (req,res,next) => {
         const { username } = req.params;
-        console.log("Attempted to get user with username: ", username)
         
         try {
-            const authenticated = req.isAuthenticated();
-            let currentUser = await dbUtils.getPublicUserInfo(dbPool, req.user.id);
-            if (!currentUser) {
-                currentUser=""
+            try {
+                const requestedUserPrivate = await dbUtils.getUserByUsername(dbPool, username);
+                const requestedUserID = requestedUserPrivate.id;
+                const requestedUser = await dbUtils.getPublicUserInfo(dbPool, requestedUserID);
+                console.log(req.isAuthenticated(), requestedUser);
+                if (req.isAuthenticated() && requestedUser.username==req.user.username) {
+                    res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true)});
+                    return;
+                }
+            } catch (err) {
+                console.error(err);
             }
-            if (authenticated) {
-                res.render('privateUserPage', {user: currentUser});
-            } else {
-                res.render('publicUserPage', {user: currentUser});
-            }
+            res.render('publicUserPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false)});
         } catch (err) {
+            console.error(err);
             res.status(500);
+            return;
         }
     });
 }
@@ -116,7 +143,6 @@ async function init(app, _dbPool, _passport) {
 function returnToHomepageIfAuthenticated (req,res,next) {
     try {
         if (req.isAuthenticated()) {
-            console.log(req.user);
             return res.redirect('/');
         }
         next();

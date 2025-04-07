@@ -2,8 +2,6 @@ import bcrypt, { hash } from 'bcrypt'
 import mysql from 'mysql2'
 
 
-
-
 async function initDB(dbPool) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
@@ -28,9 +26,18 @@ async function initDB(dbPool) {
         );`;
         await dbPool.query(CHANNELcreateTableQuery);
       
+        const SESSIONcreateTableQuery =
+        `CREATE TABLE IF NOT EXISTS sessions (
+            session_id varchar(128) COLLATE utf8mb4_bin NOT NULL,
+            expires int(11) unsigned NOT NULL,
+            data mediumtext COLLATE utf8mb4_bin,
+            PRIMARY KEY (session_id)
+        ) ENGINE=InnoDB`
+        await dbPool.query(SESSIONcreateTableQuery);
+
 
     } catch (err) {
-        console.error('Error using database:', err);
+        console.error('Error initializing database:', err);
     }
 }
 
@@ -81,6 +88,8 @@ async function clearDB(dbPool)
     const deleteAllChannelsQuery =  `DROP TABLE IF EXISTS ${process.env.MYSQL_CHANNEL_TABLE};`;
     await dbPool.query(deleteAllChannelsQuery)
 
+    const dropSessionsQuery = 'DROP TABLE IF EXISTS sessions';
+    await dbPool.query(dropSessionsQuery);
     // recreate tables
     initDB(dbPool);
 
@@ -216,17 +225,17 @@ async function getUserIDfromUsername(dbPool, username) {
     }
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`
-        const {res} = await dbPool.query(query, {username});
-        if (res == undefined) {
+        const [rows] = await dbPool.query(query, [username]);
+        if (rows == undefined) {
             return undefined; // user doesn't exist
         }
-        if (res.length>1) {
+        if (rows.length>1) {
             console.log("Fatal error, more than two users share the same username: ", username)
             console.log("Shutting down server due to possible security vulnerability.")
             process.exit(); // nuke the server, as this could be the result of a security vulnerability
         }
-        if (res.length>=0) {
-            return res[0].id;
+        if (rows.length>0) {
+            return rows[0].id;
         }
         
     } catch (err) {
@@ -325,7 +334,7 @@ async function getPublicUserInfo(dbPool, id) {
         let myUser = {};
         myUser.username = privateUser.username;
         myUser.description = privateUser.description;
-        myUser.Date = privateUser.datetime;
+        myUser.Date = privateUser.registerDate;
         return myUser;
     } catch (err) {
         console.error("Could not convert private user to public user: ", err);

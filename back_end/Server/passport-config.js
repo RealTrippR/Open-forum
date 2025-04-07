@@ -8,7 +8,7 @@ const localStrategy = passportLocal.Strategy
 
 let dbPool = undefined;
 
-function initialize(_dbPool, passport, getUserByUsername, getUserById) {
+function initialize(_dbPool, passport) {
     dbPool = _dbPool;
     const authenticateUser = async (username, password, done) => {
         const user = await dbUtils.getUserByUsername(dbPool, username);
@@ -23,20 +23,22 @@ function initialize(_dbPool, passport, getUserByUsername, getUserById) {
                 return done(null, false, {message: 'Incorrect password'});
             }
         } catch (err) {
+            console.error("Failed to authenticate user: ",err);
             return done(err);
         }
     }
 
-    
     passport.use(new localStrategy({usernameField: 'username'}, authenticateUser ));
-    passport.serializeUser((user, done) =>  { done (null, user.id)} );
+    passport.serializeUser((user, done) => {
+        done(null, user.id);  // Store user ID in the session
+    });
+    
     passport.deserializeUser(async (id, done) => {
         try {
             const user = await dbUtils.getPublicUserInfo(dbPool, id);
-            // Pass the user object to done() to populate req.user
-            done(null, user);
+            done(null, user);  // Store user object in req.user
         } catch (err) {
-            done(err, null);
+            done(err);
         }
     });
 }
