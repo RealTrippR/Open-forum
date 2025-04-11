@@ -134,6 +134,10 @@ function loadThreads(threads) {
     }
 
     const threadsHolder = document.getElementById("channelThreadsHolder");
+    threadsHolder.style.display = 'inline'; // make visible
+    const msgHolder = document.getElementById('threadMessagesHolder');
+    msgHolder.style.display = 'none';     // make message holder invis
+
     // delete old threads
     threadsHolder.innerHTML = '';
     createStagingThread(); // recreate staging thread bc we just deleted it
@@ -149,7 +153,7 @@ function loadThreads(threads) {
         const thh = document.createElement("div");
         thh.className = "threadHeaderHolder";
         thh.dataset.threadID = thread.id;
-        thh.addEventListener('click', loadThreadFromThreadHandleButton);
+        thh.addEventListener('click', setCurrentThreadFromThreadHandleButton);
 
         const title = document.createElement("p");
         title.className = "threadHeaderTitle";

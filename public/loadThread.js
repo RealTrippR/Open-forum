@@ -24,13 +24,13 @@ async function getThreadMessagesFromServer(threadID) {
 }
 
 
-function getCurrentThread() {
+function getCurrentThreadID() {
     return window.currentThreadID;
 }
 
 // opens the thread by ID
 // returns the thread messages
-async function loadThreadByID(threadID) {
+async function loadThreadFromID(threadID) {
     window.currentThreadID = threadID;
 
     
@@ -49,9 +49,9 @@ async function loadThreadByID(threadID) {
     return threadMessages;
 }
 
-async function loadThreadFromThreadHandleButton() {
+async function setCurrentThreadFromThreadHandleButton() {
     const btn = event.currentTarget; // The clicked <li> element
-    await loadThreadByID(btn.dataset.threadID);
+    await setCurrentThread(btn.dataset.threadID);
 }
 
 function initMessageHolder() {
@@ -67,7 +67,13 @@ function setCurrentThread(threadID) {
         }
     }
 
-    loadThread(getCurrentThread());
+
+    const threadsHolder = document.getElementById("channelThreadsHolder");
+    threadsHolder.style.display = 'none'; // make visible
+    const msgHolder = document.getElementById('threadMessagesHolder');
+    msgHolder.style.display = 'inline';     // make message holder invis
+
+    loadThreadFromID(getCurrentThreadID());
 }
 
 //export default {getCurrentThread, getThreadMessagesFromServer, loadThreadByID}

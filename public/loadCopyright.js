@@ -1,0 +1,4 @@
+/*
+loads the copyright notice
+that goes on the bottom on the page
+*/

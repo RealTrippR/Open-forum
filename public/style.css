@@ -159,7 +159,7 @@ div.channelNameHeader {
 }
 
 /*--------------------------------------------*/
-/*Thread headers*/
+/*THREAD HEADERS*/
 .threadHeaderHolder {
     border : 1px solid black;
     margin: 0px;
@@ -176,6 +176,19 @@ div.channelNameHeader {
     font-size: 22px;
     font-weight: 600;
 }
+/*--------------------------------------------*/
+/*MESSAGES*/
+.threadMessagesHolder {
+    position: absolute;
+    top: 84px;
+    left: var(--channelBarWidth);
+    width: calc(100% - var(--channelBarWidth));
+    min-width: var(300px);
+    background-color: var(--backgroundColor);
+    border: 1px solid black;
+    padding: 0px;
+}
+
 
 /*--------------------------------------------*/
 /*USER ACCOUNT MANAGEMENT*/
