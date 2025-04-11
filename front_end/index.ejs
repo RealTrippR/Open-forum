@@ -25,7 +25,7 @@
         // it's weird, but it works - don't touch it!
         let _channels = <%- JSON.stringify(channels) %>
         window.channels = JSON.parse(_channels);
-        
+        console.log('auth:', window.loggedIn);
         //window.channels = getTest;  // Converts to a valid JS object
         //window.channels = JSON.parse('[{"id":1,"name":"Test Channel","topicListID":0}]' );
         loadChannelBar();

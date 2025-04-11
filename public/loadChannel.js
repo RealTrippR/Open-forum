@@ -33,37 +33,39 @@ function createStagingThread() {
     const threadsHolder = document.getElementById("channelThreadsHolder");
     threadsHolder.innerHTML = '';
 
-    // create staging thread if it does not exist
-    let stagingThreadDropdownButtonDIV = document.getElementById('stagingThreadDropdownButton');
-    if (stagingThreadDropdownButtonDIV==null) {
-        stagingThreadDropdownButtonDIV = document.createElement('div');
-        const div = stagingThreadDropdownButtonDIV;
+    if (window.loggedIn) {
+        // create staging thread if it does not exist
+        let stagingThreadDropdownButtonDIV = document.getElementById('stagingThreadDropdownButton');
+        if (stagingThreadDropdownButtonDIV==null) {
+            stagingThreadDropdownButtonDIV = document.createElement('div');
+            const div = stagingThreadDropdownButtonDIV;
 
-        div.id = 'stagingThreadDropdownButton';
-        div.style.backgroundColor = 'var(--backgroundColor)'
-        div.style.height = '26px';
-        div.style.border = 'var(--stdBorder)'
-        div.style.display = 'flex'
+            div.id = 'stagingThreadDropdownButton';
+            div.style.backgroundColor = 'var(--backgroundColor)'
+            div.style.height = '26px';
+            div.style.border = 'var(--stdBorder)'
+            div.style.display = 'flex'
 
-        
-        const p = document.createElement('p');
-        p.className = 'stdText';
-        p.textContent = 'Create Thread'
-        p.style.margin = '0px auto'
-        p.style.fontSize = 26
-        div.appendChild(p);
+            const p = document.createElement('p');
+            p.className = 'stdText';
+            p.textContent = 'Create Thread'
+            p.style.margin = '0px auto'
+            p.style.fontSize = 26
 
-        div.addEventListener('click', () => {
-            const stagingThreadDiv = document.getElementById('stagingThread');
-            if (stagingThreadDiv.style.display === 'none') {
-                stagingThreadDiv.style.display = 'block'; // Show
-            } else {
-                stagingThreadDiv.style.display = 'none'; // Hide
-            }
-            console.log('click');
-        });
+            div.appendChild(p);
 
-        threadsHolder.appendChild(div);
+            div.addEventListener('click', () => {
+                const stagingThreadDiv = document.getElementById('stagingThread');
+                if (stagingThreadDiv.style.display === 'none') {
+                    stagingThreadDiv.style.display = 'block'; // Show
+                } else {
+                    stagingThreadDiv.style.display = 'none'; // Hide
+                }
+                console.log('click');
+            });
+
+            threadsHolder.appendChild(div);
+        }
     }
 
     // create staging thread if it does not exist

@@ -61,11 +61,12 @@ async function init(app,_dbOptions, _dbPool, _passport) {
             console.log(await req.isAuthenticated());
             const authenticated = await req.isAuthenticated();
 
+            let currentUser = undefined;
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
             }
             console.log(await req.isAuthenticated());
-            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser)})
+            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated)})
           
         } catch (err) {
             console.error(err);
