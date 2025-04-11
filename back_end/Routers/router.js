@@ -59,10 +59,6 @@ async function init(app,_dbOptions, _dbPool, _passport) {
             const channels = await dbUtils.getChannels(dbPool);
 
             console.log(await req.isAuthenticated());
-            const loggedIn = await req.isAuthenticated();
-            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(loggedIn)})
-            let currentUser = "";
-
             const authenticated = await req.isAuthenticated();
 
             if ( authenticated && req.user != undefined) {
