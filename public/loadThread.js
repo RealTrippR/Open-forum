@@ -28,6 +28,14 @@ function getCurrentThreadID() {
     return window.currentThreadID;
 }
 
+function addMessageToMessageHolder(message) {
+    const msgUL = document.getElementById('message-UL');
+
+    msgUL.innerHTML = '';
+    msgUL.innerHTML += `<li> ${message} </li>`
+    
+}
+
 // opens the thread by ID
 // returns the thread messages
 async function loadThreadFromID(threadID) {
@@ -44,8 +52,10 @@ async function loadThreadFromID(threadID) {
     console.log('Loaded messages of threadID: ', threadID);
     console.log('Messages: ', threadMessages);
 
+    for (let message of threadMessages) {
+        addMessageToMessageHolder(message)
+    }
 
-    // 
     return threadMessages;
 }
 
@@ -73,7 +83,12 @@ function setCurrentThread(threadID) {
     const msgHolder = document.getElementById('threadMessagesHolder');
     msgHolder.style.display = 'inline';     // make message holder invis
 
+    msgHolder.innerHTML = ''; // clear existing messages
+
+    msgHolder.innerHTML += '<UL id="message-UL"> </UL>' // the list where the actual messages are stored
     loadThreadFromID(getCurrentThreadID());
+
+    
 }
 
 //export default {getCurrentThread, getThreadMessagesFromServer, loadThreadByID}
