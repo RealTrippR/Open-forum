@@ -1,9 +1,16 @@
 import '../../env.js'
+
 const PORT = process.env.SERVER_PORT;
 process.saltRounds = 13
 import express from 'express'
 const app = express();
-import bcrypt from 'bcrypt';
+import { createServer } from 'node:http';
+const server = createServer(app); // traditional HTTP server
+
+//https://socket.io/docs/v4/tutorial/step-3
+import { Server } from 'socket.io';
+const io = new Server(server);
+
 import passport from 'passport';
 
 
@@ -38,7 +45,7 @@ const channels = await dbUtils.getChannels(dbPool);
 dbUtils.addThreadToChannel(dbPool, 0, "Test Thread", "A thead for testing purposes", channels[0].id)
 
 import router from '../Routers/router.js'
-await router.init(app,dbOptions,dbPool, passport);
+await router.init(app,dbOptions,dbPool, passport, io);
 import dbAPI from '../Routers/databaseAPI.js'
 await dbAPI.init(app,dbPool)
 
@@ -47,9 +54,14 @@ dbUtils.getChannels(dbPool);
 await dbUtils.registerUser(dbPool, 'w@w', 'w', "w", "my description! A max of 256 characters");
 
 
-
+io.engine.on("connection_error", (err) => {
+    console.log(err.req);      // the request object
+    console.log(err.code);     // the error code, for example 1
+    console.log(err.message);  // the error message, for example "Session ID unknown"
+    console.log(err.context);  // some additional error context
+  });
 
 // Start the server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });

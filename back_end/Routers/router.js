@@ -17,20 +17,24 @@ const PORT = process.env.SERVER_PORT;
 
 let passport;
 let dbPool;
+let io;
 
-async function init(app,_dbOptions, _dbPool, _passport) {
+async function init(app,_dbOptions, _dbPool, _passport, _io) {
     dbOptions = _dbOptions;
     sessionStore = new MySQLStore(dbOptions);
 
     dbPool = _dbPool
     passport = _passport;
+    io = _io;
     
     app.set('port', PORT);
     app.set('views', process.env.FRONT_END_DIR);
     app.set('view engine', 'ejs')
-    app.engine('html', ejs.renderFile)
+    //app.engine('html', ejs.renderFile)
     app.use(express.static('public'));  // Ensure that static files are inside a "public" folder
-    app.use(express.json());
+    //app.use(express.static('socket-io'));  // Ensure that static files are inside a "public" folder
+
+    //app.use(express.json());
     
     // init passport
     app.use(express.urlencoded({extended: false}))
@@ -38,7 +42,6 @@ async function init(app,_dbOptions, _dbPool, _passport) {
     const TWO_HOURS = 1000 * 60 * 60 * 2
     // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
     app.use(session({
-        name: process.env.SESSION_NAME,
         name: process.env.SESSION_NAME,
         secret: process.env.SESSION_SECRET,
         resave: false,
@@ -58,14 +61,12 @@ async function init(app,_dbOptions, _dbPool, _passport) {
         try {
             const channels = await dbUtils.getChannels(dbPool);
 
-            console.log(await req.isAuthenticated());
             const authenticated = await req.isAuthenticated();
 
             let currentUser = undefined;
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
             }
-            console.log(await req.isAuthenticated());
             res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated)})
           
         } catch (err) {
@@ -205,6 +206,15 @@ function returnToHomepageIfAuthenticated (req,res,next) {
     } catch {
         next();
     }
+
+
+
+
+    /******************************************************** */
+    /* SOCKET IO */
+
+ 
+
 }
 /*
 function checkAuthenticated(req, res, next) {
@@ -230,5 +240,7 @@ function checkNotAuthenticated(req,res,next) {
     }
 }
 */
+
+
 
 export default {init}

@@ -2,6 +2,8 @@
 <html lang="en">
 <head> 
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title> OpenForum </title>
     <link rel="stylesheet" href="/style.css">
 </head>
@@ -11,6 +13,8 @@
 <div id="channelThreadsHolder" class="channelThreadsHolder"> </div> <!-- thread header buttons are stored here -->
 <div id="threadMessagesHolder" class="threadMessagesHolder" style="display: none;"> </div> <!-- holds the messages for the current thread-->
 <div id="channelNameHeader" class="channelNameHeader"> </div>
+<script> const SOCKET_IO_PORT = 8080 </script>
+<script src="/socket.io/socket.io.js"></script>
 <script src="/loadNavbar.js"> </script>
 <script src="/loadThread.js"> </script>
 <script src="/loadChannelBar.js"> </script>
@@ -28,6 +32,7 @@
         //window.channels = getTest;  // Converts to a valid JS object
         //window.channels = JSON.parse('[{"id":1,"name":"Test Channel","topicListID":0}]' );
         loadChannelBar();
+        initMessageHolder();
         setCurrentChannel(window.channels[0]);
         console.log("Page has fully loaded");
         // Your code to execute after the page is loaded

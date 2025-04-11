@@ -3,6 +3,7 @@
 
     --mainTextColor: #e5e2d9;
     --backgroundColor: rgb(127, 147, 127);
+    --chatTypeBoxHeight: 40px;
     --navBarColor:  color-mix(in srgb, var(--backgroundColor) 90%, black);
     --stdHeaderFontFamily:"Times New Roman", Georgia, serif;
     --stdMinorFontFamily:"Verdana",Geneva,sans-serif;
@@ -183,12 +184,66 @@ div.channelNameHeader {
     top: 84px;
     left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth));
+    margin-bottom: var(--chatTypeBoxHeight);
     min-width: var(300px);
     background-color: var(--backgroundColor);
     border: 1px solid black;
     padding: 0px;
 }
 
+/*--------------------------------------------*/
+/*CHAT BOX*/
+div.chatTypeDiv {
+    position: fixed;
+    height: var(--chatTypeBoxHeight);
+    left: var(--channelBarWidth);
+    width: calc(100% - var(--channelBarWidth) - 30px - 300px ); /* - 60px -> should be margin x 2*/ 
+    background-color: var(--navBarColor);
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
+    bottom: 0;
+    margin: 30px;
+    display: flex; /* flex layout */
+}
+
+.chat-message-holder {
+    flex: 1;
+    border: var(--stdBorder);
+    background-color: transparent;
+    height: 100%;
+    font-size: 15px; /* optional, to style input text */
+    font-family: var(--stdMinorFontFamily);
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-size: 19px;
+    font-weight: 400;
+    padding: 5px;
+    box-sizing: border-box; /* Ensures padding/border stays within 100% height */
+    margin-right: 105px;
+}
+
+.send-button {
+    position: absolute;
+    border: var(--stdBorder);
+    height: calc(var(--chatTypeBoxHeight) - 6px);
+    margin: 3px;
+    right: 0px;
+    min-width: 100px;
+    box-shadow: var(--stdMinorShadow);
+    background-color: var(--navBarColor);
+    cursor: pointer;
+
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    font-family: var(--stdMinorFontFamily);
+    text-shadow: var(--stdShadow);
+}
+
+.send-button:hover {
+    background-color: color-mix(in srgb, var(--navBarColor) 80%, white);
+}
 
 /*--------------------------------------------*/
 /*USER ACCOUNT MANAGEMENT*/

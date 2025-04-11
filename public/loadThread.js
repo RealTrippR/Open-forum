@@ -1,3 +1,5 @@
+const socket = io();
+
 async function getThreadMessagesFromServer(threadID) {
     return (async () => {
     try {
@@ -21,6 +23,10 @@ async function getThreadMessagesFromServer(threadID) {
         throw error;
         }
     })();
+}
+
+function sendMessage(message) {
+    socket.emit('message', message);  // Emit message to server
 }
 
 
@@ -66,8 +72,35 @@ async function setCurrentThreadFromThreadHandleButton() {
 }
 
 function initMessageHolder() {
-    const messageHolder = document.getElementById('thread-message-holder');
-    //messageHolder.
+     
+    // socket io is used to send and recieve messages only!
+    socket.on('connect', () => {
+        console.log('Connected to socket-io server');
+    });
+
+
+    const chatTypeBoxDiv = document.createElement('div');
+    chatTypeBoxDiv.id = 'chatTypeDiv';
+    chatTypeBoxDiv.className = 'chatTypeDiv'
+    chatTypeBoxDiv.style.display = 'none';
+    document.body.appendChild(chatTypeBoxDiv);
+    
+    chatTypeBoxDiv.style.alignItems = 'stretch';
+    chatTypeBoxDiv.style.height = '40px';
+    chatTypeBoxDiv.innerHTML = `
+    <button type="submit" id="send-button" class="send-button">Send</button>`;
+
+    const msgHolder = document.createElement('input');
+    msgHolder.id = 'chat-message-holder'
+    msgHolder.className = 'chat-message-holder';
+
+    chatTypeBoxDiv.appendChild(msgHolder);
+
+    const sendButton = document.getElementById("send-button");
+    document.addEventListener('click', () => {
+        sendMessage(msgHolder.value)
+    });
+
 }
 
 function setCurrentThread(threadID) {
@@ -85,11 +118,13 @@ function setCurrentThread(threadID) {
     msgHolder.style.display = 'inline';     // make message holder invis
 
     msgHolder.innerHTML = ''; // clear existing messages
-
     msgHolder.innerHTML += '<UL id="message-UL"> </UL>' // the list where the actual messages are stored
-    loadThreadFromID(getCurrentThreadID());
 
-    
+    const msgChatBox = document.getElementById('chatTypeDiv')
+    if (window.loggedIn) {
+        msgChatBox.style.display = 'flex';
+    }
+    loadThreadFromID(getCurrentThreadID());
 }
 
 //export default {getCurrentThread, getThreadMessagesFromServer, loadThreadByID}
