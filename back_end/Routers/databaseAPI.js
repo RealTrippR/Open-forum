@@ -131,7 +131,7 @@ async function init(app, _dbPool) {
             
             //console.log("THREAD ID: ", req);
 
-            const messages = 'test-res';
+            const messages = ['test-res, modify databaseAPI to work properly'];
             res.status(200).json({messages: messages}).send();
         } catch (err) {
             console.error("Failed to get thread messages: ", err);

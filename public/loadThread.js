@@ -47,7 +47,8 @@ async function loadThreadFromID(threadID) {
     threadsHolder.style.display = 'none';
 
     // load the messages
-    const threadMessages = await getThreadMessagesFromServer(threadID);
+    const res = await getThreadMessagesFromServer(threadID);
+    const threadMessages = res.messages;
 
     console.log('Loaded messages of threadID: ', threadID);
     console.log('Messages: ', threadMessages);
