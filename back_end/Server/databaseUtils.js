@@ -2,8 +2,6 @@ import bcrypt, { hash } from 'bcrypt'
 import mysql from 'mysql2'
 
 
-
-
 async function initDB(dbPool) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
@@ -13,24 +11,35 @@ async function initDB(dbPool) {
         const USERcreateTableQuery = `
         CREATE TABLE IF NOT EXISTS ${process.env.MYSQL_USER_TABLE} (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(64) NOT NULL,
-            email VARCHAR(128) NOT NULL,
+            username VARCHAR(32) NOT NULL,
+            email VARCHAR(256) NOT NULL,
             password VARCHAR(128) NOT NULL,
-            description VARCHAR(128) NOT NULL DEFAULT "",
+            description VARCHAR(256) NOT NULL DEFAULT "",
+            profilePicture LONGBLOB DEFAULT NULL,
             registerDate DATETIME NOT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
         const CHANNELcreateTableQuery = `
         CREATE TABLE IF NOT EXISTS ${process.env.MYSQL_CHANNEL_TABLE} (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
+            name VARCHAR(32) NOT NULL,
+            description VARCHAR(64) NOT NULL DEFAULT "",
             threadListId INT NOT NULL
         );`;
         await dbPool.query(CHANNELcreateTableQuery);
       
+        const SESSIONcreateTableQuery =
+        `CREATE TABLE IF NOT EXISTS sessions (
+            session_id varchar(128) COLLATE utf8mb4_bin NOT NULL,
+            expires int(11) unsigned NOT NULL,
+            data mediumtext COLLATE utf8mb4_bin,
+            PRIMARY KEY (session_id)
+        ) ENGINE=InnoDB`
+        await dbPool.query(SESSIONcreateTableQuery);
+
 
     } catch (err) {
-        console.error('Error using database:', err);
+        console.error('Error initializing database:', err);
     }
 }
 
@@ -40,29 +49,40 @@ async function initChannels(dbPool) {
     }
     try {
         if (await getChannelCount(dbPool)===0) {
-            await createChannel(dbPool, "General")
+            await createChannel(dbPool, "General", "General Discussion")
             await createChannel(dbPool, "Help")
             await createChannel(dbPool, "Beginners")
             await createChannel(dbPool, "Optimization");
-            await createChannel(dbPool, "Development");
-            await createChannel(dbPool, "Feature Requests")
-            await createChannel(dbPool, "Bug Reports")
-            await createChannel(dbPool, "Showcase")
+            await createChannel(dbPool, "Development", "Discussion related to the development of this project");
+            await createChannel(dbPool, "Feature Requests", "Request for new features. See the pinned thread")
+            await createChannel(dbPool, "Bug Reports", "Report issues here or via the github page")
+            await createChannel(dbPool, "Showcase", "Share your projects")
         }
     } catch(err) {
         console.log("Failed to initialize channels: ", err);
     }
 }
 
-async function clearDB(dbPool)
+async function clearDB(dbPool, clearSessions = true)
 {
     const channels = await getChannels(dbPool);
     if (channels !== undefined) {
         for (let channel of channels) {
+            // delete messages for all threads in that channel
+            const threads = await getThreadsFromChannel(dbPool,channel.id);
+            for (let thread of threads) {
+                const threadMessageTableName = getMessageTableNameFromThread(thread.id, channel.id);
+                const deleteMsgTableQuery = `DROP TABLE IF EXISTS ${threadMessageTableName}`;
+                await dbPool.query(deleteMsgTableQuery);
+            }
+           
+
             // delete channel thread table
             const threadTableName = getThreadTableNameFromChannelID(channel.id);
             const deleteThreadTableQuery = `DROP TABLE IF EXISTS ${threadTableName}`;
             await dbPool.query(deleteThreadTableQuery);
+
+          
         }
     }
 
@@ -81,6 +101,10 @@ async function clearDB(dbPool)
     const deleteAllChannelsQuery =  `DROP TABLE IF EXISTS ${process.env.MYSQL_CHANNEL_TABLE};`;
     await dbPool.query(deleteAllChannelsQuery)
 
+    if (clearSessions){
+        const dropSessionsQuery = 'DROP TABLE IF EXISTS sessions';
+        await dbPool.query(dropSessionsQuery);
+    }
     // recreate tables
     initDB(dbPool);
 
@@ -98,22 +122,18 @@ async function getChannelCount(dbPool) {
 }
 
 // returns the channel id if successful, otherwise returns undefined
-async function createChannel(dbPool, name) {
+async function createChannel(dbPool, name, description) {
     if (dbPool === undefined) {throw new Error('dbPool is required as an argument');}
-
+    if (description == undefined) {description = ""};
     const threadListChannelId = 0; //temp, replace with actual value
-    const createChannelQuery = `INSERT INTO ${process.env.MYSQL_CHANNEL_TABLE} (name, threadListID) VALUES (?, ?)`;
+    const createChannelQuery = `INSERT INTO ${process.env.MYSQL_CHANNEL_TABLE} (name, threadListID, description) VALUES (?, ?, ?)`;
 
-    const [result] = await dbPool.execute(createChannelQuery, [name, threadListChannelId]);
+    const [result] = await dbPool.execute(createChannelQuery, [name, threadListChannelId, description]);
     console.log(`Created channel ${name} successfully`);
 
     createThreadTableForChannel(dbPool, result.insertId);
 
     return result.insertId;
-}
-
-function getThreadTableNameFromChannelID(channelID) {
-    return process.env.MYSQL_THREAD_TABLE + String(channelID);
 }
 
 async function createThreadTableForChannel(dbPool, channelID) {
@@ -125,32 +145,52 @@ async function createThreadTableForChannel(dbPool, channelID) {
         id INT AUTO_INCREMENT PRIMARY KEY,
         ownerID INT,
         name VARCHAR(64),
+        description VARCHAR(128) NOT NULL DEFAULT "",
+        lastModified DATETIME,
         creationDate DATETIME
     )
     `;
     await dbPool.query(createTableQuery);
 }
 
-const tableName = function getThreadTableNameFromChannelID(channelID) {
+async function createMessageTableForThread(dbPool, channelID, threadID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument'); }
+
+    const tableName = getMessageTableNameFromThread(channelID, threadID);
+
+    // message table
+    const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ownerID INT,
+        content VARCHAR(1024),
+        date DATETIME
+    )
+    `
+}
+
+function getMessageTableNameFromThread(threadID, channelID) {
+    return process.env.MYSQL_MESSAGE_TABLE + String(threadID) + "__" + String(channelID);
+}
+
+function getThreadTableNameFromChannelID(channelID) {
     return process.env.MYSQL_THREAD_TABLE + String(channelID);
 }
 
-async function getMessageTableNameFromChannelIDandThreadID(threadID, channelID) {
-    return 'message_' + String(channelID) + "_" + String(threadID); 
-}
-
-async function addThreadToChannel(dbPool, threadOwnerID, threadName, channelID) {
+async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescription, channelID) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
     }
     const tableName = getThreadTableNameFromChannelID(channelID);(channelID);
-    const addThreadQuery = `INSERT INTO ${tableName} (ownerID, name, creationDate) VALUES (?, ?, ?)`;
+    const addThreadQuery = `INSERT INTO ${tableName} (ownerID, name, description, creationDate) VALUES (?, ?, ?, ?)`;
 
     const now = new Date();
     const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
     
-    const [result] = await dbPool.query(addThreadQuery, [threadOwnerID, threadName, datetime]);
+    const [result] = await dbPool.query(addThreadQuery, [threadOwnerID, threadName, threadDescription, datetime]);
+    await createMessageTableForThread(dbPool, channelID, result.insertId);
+    
     console.log("Succesfully created thead ",threadName);
+
     return result.insertId;
 }
 
@@ -216,17 +256,17 @@ async function getUserIDfromUsername(dbPool, username) {
     }
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`
-        const {res} = await dbPool.query(query, {username});
-        if (res == undefined) {
+        const [rows] = await dbPool.query(query, [username]);
+        if (rows == undefined) {
             return undefined; // user doesn't exist
         }
-        if (res.length>1) {
+        if (rows.length>1) {
             console.log("Fatal error, more than two users share the same username: ", username)
             console.log("Shutting down server due to possible security vulnerability.")
             process.exit(); // nuke the server, as this could be the result of a security vulnerability
         }
-        if (res.length>=0) {
-            return res[0].id;
+        if (rows.length>0) {
+            return rows[0].id;
         }
         
     } catch (err) {
@@ -270,30 +310,33 @@ async function getUserByUsername(dbPool, username) {
     return undefined;
 }
 
-// returns the ID of the created user, returns undefined if it fails to get user or if the user already exists
-async function registerUser(dbPool, email, username, plainPassword) {
+// returns the ID of the created user, returns error or undefined if it fails to get user or if the user already exists
+async function registerUser(dbPool, email, username, plainPassword, description = "" /*optional*/) {
     if (dbPool === undefined) {
-        throw new Error('dbPool is required as an argument');
+        throw new new Error('dbPool is required as an argument');
     }
     if (username == null || email == null || plainPassword == null) {
-        return Error("Enter valid data"); // invalid data passed into function
+        return new Error("Enter valid data"); // invalid data passed into function
     }
     if(validateEmail(email)){ 
-        return "Invalid Email"
+        return new Error("Invalid Email")
     }
-    if (await getUserIDfromUsername(dbPool, username) !== undefined) {
-        return "Username is taken";
+    const tmp = await getUserIDfromUsername(dbPool, username);
+    const isNameTaken = tmp!== undefined;
+    console.log('isTaken? ', isNameTaken);
+    if (isNameTaken) {
+        return new Error("Username is taken");
     }
     try {
         const hashedPassword = await bcrypt.hash(plainPassword, process.saltRounds);
 
-        const query = `INSERT INTO ${process.env.MYSQL_USER_TABLE} (username, email, password, registerDate) VALUES (?, ?, ?, ?)`;
+        const query = `INSERT INTO ${process.env.MYSQL_USER_TABLE} (username, email, password, registerDate, description) VALUES (?, ?, ?, ?, ?)`;
         console.log(query);
 
         const now = new Date();
         const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
 
-       const [result] = await dbPool.execute(query, [username, email, hashedPassword, datetime]);
+       const [result] = await dbPool.execute(query, [username, email, hashedPassword, datetime, description]);
 
        console.log("User registered successfully");
        return result.insertId;
@@ -314,9 +357,19 @@ async function getThreadsFromChannel(dbPool, channelID) {
     return rows;
 }
 
+async function getDescriptionFromChannel(dbPool, channelID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
+    if (channelID === undefined) { throw new Error('channelID is required as an argument');}
+    
+    const getQuery = `SELECT * FROM ${process.env.MYSQL_CHANNEL_TABLE} WHERE id = ?;`
+    const [rows] = await dbPool.query(getQuery, [channelID]);
+    return rows[0].description;
+}
+
 // returns a user struct without any sensitive information (i.e. no passwords)
 // returns undefined if the user does not exist
 async function getPublicUserInfo(dbPool, id) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
     try {
         const privateUser = await getUserFromID(dbPool, id);
         if (privateUser == undefined) {
@@ -325,10 +378,54 @@ async function getPublicUserInfo(dbPool, id) {
         let myUser = {};
         myUser.username = privateUser.username;
         myUser.description = privateUser.description;
-        myUser.Date = privateUser.datetime;
+        myUser.Date = privateUser.registerDate;
         return myUser;
     } catch (err) {
         console.error("Could not convert private user to public user: ", err);
+        return undefined;
+    }
+}
+
+//
+async function updateUserName(dbPool, newUsername, userID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
+    
+    try {
+        if (newUsername === undefined) { throw new Error('newUsername is required as an argument');}
+        if (userID === undefined) { throw new Error('userID is required as an argument');}
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET username = ? WHERE id = ?`
+
+        await dbPool.query(query, [newUsername, userID]);
+    } catch (err) {
+        console.error("Failed to updateUsername: ", err);
+    }
+}
+
+async function updateUserDescription(dbPool, newUserDescription, userID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+
+    try {
+        if (newUserDescription == undefined) {throw new Error('newUserDescription is required as an argument')}
+        if (userID == undefined) {throw new Error('userID is required as an argument')}
+
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET description = ? WHERE id = ?`
+        await dbPool.query(query, [newUsername, newUserDescription]);
+    } catch (err) {
+
+    }
+}
+
+async function getMessagesFromThread(dbPool, channelID, threadID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+    if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+    if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+
+    try {
+        
+        const query = ``;
+
+    } catch (err) {
+        console.error("Failed to get messages from thread: ", err);
         return undefined;
     }
 }
@@ -337,5 +434,5 @@ export default {
     initDB, clearDB, initChannels, getChannelCount, registerUser, 
     isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
     createChannel, getChannels, addThreadToChannel, getThreadsFromChannel,
-    getPublicUserInfo
+    getDescriptionFromChannel, getPublicUserInfo, updateUserName, updateUserDescription,
 };

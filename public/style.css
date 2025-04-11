@@ -1,9 +1,12 @@
 :root {
+    --channelBarWidth: 250px;
+
     --mainTextColor: #e5e2d9;
     --backgroundColor: rgb(127, 147, 127);
     --navBarColor:  color-mix(in srgb, var(--backgroundColor) 90%, black);
     --stdHeaderFontFamily:"Times New Roman", Georgia, serif;
-    --stdMinorFontFamily:"Verdana",Geneva,sans-serif; ;
+    --stdMinorFontFamily:"Verdana",Geneva,sans-serif;
+    --stdBorder: 1.5px solid black;
     /*--stdShadowOffset:  2px 2px 0px rgba(0, 0, 0, 1). /* Horizontal, Vertical, Blur, Color */
     --stdShadow: 
         .3px .3px 0px rgba(0, 0, 0, 1),
@@ -87,7 +90,7 @@ body {
     background-color: var(--backgroundColor);
     border : 1px solid black;
     border-top: 0px;
-    width: 150px;
+    width: var(--channelBarWidth);
 }
 
 li.channelBarHeader {
@@ -95,14 +98,15 @@ li.channelBarHeader {
 }
 
 li.channelBarHeader p {
-    margin: 1px;
+    margin: 3px;
     text-align: center;
     padding-top:0;
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
     text-decoration: none;
     font-weight: 600;
-    font-size: 20px;
+    font-size: 22px;
+    height: 29px;
 }
 
 li.channelBarHandleButton {
@@ -111,10 +115,12 @@ li.channelBarHandleButton {
     background-color: var(--backgroundColor);
 }
 
+/* 
 li.channelBarHandleButton:hover {
     box-shadow: var(--stdInsetMinorShadow);
     background-color: var(--navBarColor);
-}
+} */
+
 
 li.channelBarHandleButton p {
     margin : 2.5px;
@@ -132,13 +138,24 @@ li.channelBarHandleButton p:hover{
 
 .channelThreadsHolder {
     position: absolute;
-    top: 46px;
-    margin-left: 150px;
-    width: 100%; 
-    min-width: 150px;
+    top: 84px;
+    left: var(--channelBarWidth);
+    width: calc(100% - var(--channelBarWidth));
+    min-width: var(300px);
     background-color: var(--backgroundColor);
     border: 1px solid black;
     padding: 0px;
+}
+
+
+div.channelNameHeader {
+    position: absolute;
+    top: 46px;
+    border: 2px solid black;
+    margin-left: var(--channelBarWidth);
+    width: calc(100% - var(--channelBarWidth) - 2px);
+    display: flex;
+    vertical-align: middle;
 }
 
 /*--------------------------------------------*/
@@ -176,3 +193,13 @@ li.channelBarHandleButton p:hover{
 
 /*--------------------------------------------*/
 /*GENERAL*/
+
+.stdText{
+    margin: 1px;
+    text-align: center;
+    padding-top:0;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-weight: 400;
+}

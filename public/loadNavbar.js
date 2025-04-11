@@ -10,7 +10,12 @@ function loadNavbar() {
         <li><a href="contacts.html">CONTACT</a></li>
     `
     if (window.user) {
-        HTML +=`<li><a href="'/users/${window.user.username}">PROFILE</a></li>`
+        console.log("load",window.user);
+        console.log("load",window.user.username);
+        HTML +=`<li><a href="/users/${window.user.username}">PROFILE</a></li>`
+        if (!window.user.username) {
+            console.error("window.user.username is invalid: ", window.user.username);
+        } 
     } else {
         HTML +=`<li><a href="Login">LOGIN</a></li>`
     }
@@ -19,6 +24,6 @@ function loadNavbar() {
     </ul>
     </BODY>
     `;
-
+    
     document.getElementById("navbar").innerHTML = HTML;
 }
