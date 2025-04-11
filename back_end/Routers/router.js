@@ -7,24 +7,16 @@ import flash from 'express-flash'
 import session from 'express-session'
 import expressMysqlSession from 'express-mysql-session';
 
-import expressMysqlSession from 'express-mysql-session';
-
 
 const MySQLStore = expressMysqlSession(session);
 let sessionStore = undefined
 let dbOptions = undefined;
-const MySQLStore = expressMysqlSession(session);
-let sessionStore = undefined
-let dbOptions = undefined;
+
 import express from 'express'
 const PORT = process.env.SERVER_PORT;
 
 let passport;
 let dbPool;
-
-async function init(app,_dbOptions, _dbPool, _passport) {
-    dbOptions = _dbOptions;
-    sessionStore = new MySQLStore(dbOptions);
 
 async function init(app,_dbOptions, _dbPool, _passport) {
     dbOptions = _dbOptions;
@@ -45,20 +37,11 @@ async function init(app,_dbOptions, _dbPool, _passport) {
     app.use(flash())
     const TWO_HOURS = 1000 * 60 * 60 * 2
     // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
-    const TWO_HOURS = 1000 * 60 * 60 * 2
-    // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
     app.use(session({
         name: process.env.SESSION_NAME,
         name: process.env.SESSION_NAME,
         secret: process.env.SESSION_SECRET,
         resave: false,
-        saveUninitialized: false,
-        store: sessionStore,
-        cookie: {
-            //maxAge: TWO_HOURS,
-            sameSite: 'Lax',
-            secure: process.env.NODE_ENV === 'production' // setting secure to true breaks session functionality, but why? Also, it should be fine as long as the server is running on https
-        }
         saveUninitialized: false,
         store: sessionStore,
         cookie: {
@@ -75,16 +58,13 @@ async function init(app,_dbOptions, _dbPool, _passport) {
         try {
             const channels = await dbUtils.getChannels(dbPool);
 
-            let currentUser = "";
-            const authenticated = await req.isAuthenticated();
-            if ( authenticated && req.user != undefined) {
-                currentUser = req.user;
-            }
             console.log(await req.isAuthenticated());
             const loggedIn = await req.isAuthenticated();
             res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(loggedIn)})
             let currentUser = "";
+
             const authenticated = await req.isAuthenticated();
+
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
             }
@@ -141,11 +121,6 @@ async function init(app,_dbOptions, _dbPool, _passport) {
     app.post('/register', returnToHomepageIfAuthenticated, async (req,res) => {
         try {
             const registerRES = await dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
-            if (typeof(registerRES) == Error) {
-                res.json({err: err.toString()}).status(500).send();
-            }
-
-            const registerRES = await dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
             if (typeof(registerRES)==='string' || registerRES===undefined) { // register user will return a string if it fails
                 res.redirect('/login');
                 res.redirect('/login');
@@ -153,11 +128,7 @@ async function init(app,_dbOptions, _dbPool, _passport) {
             } else {
                 console.log("Registered user: ", registerRES);
                 res.redirect('/login');
-            } else {
-                console.log("Registered user: ", registerRES);
-                res.redirect('/login');
             }
-            
         } catch (err) {
             res.redirect('/register');
             console.log("Error registering user: ", err)
@@ -176,21 +147,6 @@ async function init(app,_dbOptions, _dbPool, _passport) {
 
                 if (req.isAuthenticated() && requestedUser.username==req.user.username) {
                     res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true), loggedIn: JSON.stringify(loggedIn)});
-                    return;
-                }
-            } catch (err) {
-                console.error(err);
-            }
-            res.render('publicUserPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false)});
-        
-        try {
-            try {
-                const requestedUserPrivate = await dbUtils.getUserByUsername(dbPool, username);
-                const requestedUserID = requestedUserPrivate.id;
-                const requestedUser = await dbUtils.getPublicUserInfo(dbPool, requestedUserID);
-                console.log(req.isAuthenticated(), requestedUser);
-                if (req.isAuthenticated() && requestedUser.username==req.user.username) {
-                    res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true)});
                     return;
                 }
             } catch (err) {
