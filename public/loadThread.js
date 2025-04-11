@@ -43,6 +43,9 @@ async function loadThreadByID(threadID) {
 
     console.log('Loaded messages of threadID: ', threadID);
     console.log('Messages: ', threadMessages);
+
+
+    // 
     return threadMessages;
 }
 

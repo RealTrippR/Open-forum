@@ -40,6 +40,7 @@ async function initDB(dbPool) {
 
     } catch (err) {
         console.error('Error initializing database:', err);
+        console.error('Error initializing database:', err);
     }
 }
 
@@ -257,6 +258,7 @@ async function getUserIDfromUsername(dbPool, username) {
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`
         const [rows] = await dbPool.query(query, [username]);
+    
         if (rows == undefined) {
             return undefined; // user doesn't exist
         }
@@ -265,6 +267,7 @@ async function getUserIDfromUsername(dbPool, username) {
             console.log("Shutting down server due to possible security vulnerability.")
             process.exit(); // nuke the server, as this could be the result of a security vulnerability
         }
+
         if (rows.length>0) {
             return rows[0].id;
         }
@@ -378,6 +381,7 @@ async function getPublicUserInfo(dbPool, id) {
         let myUser = {};
         myUser.username = privateUser.username;
         myUser.description = privateUser.description;
+        myUser.Date = privateUser.registerDate;
         myUser.Date = privateUser.registerDate;
         return myUser;
     } catch (err) {

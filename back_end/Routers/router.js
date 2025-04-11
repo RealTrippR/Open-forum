@@ -7,7 +7,12 @@ import flash from 'express-flash'
 import session from 'express-session'
 import expressMysqlSession from 'express-mysql-session';
 
+import expressMysqlSession from 'express-mysql-session';
 
+
+const MySQLStore = expressMysqlSession(session);
+let sessionStore = undefined
+let dbOptions = undefined;
 const MySQLStore = expressMysqlSession(session);
 let sessionStore = undefined
 let dbOptions = undefined;
@@ -16,6 +21,10 @@ const PORT = process.env.SERVER_PORT;
 
 let passport;
 let dbPool;
+
+async function init(app,_dbOptions, _dbPool, _passport) {
+    dbOptions = _dbOptions;
+    sessionStore = new MySQLStore(dbOptions);
 
 async function init(app,_dbOptions, _dbPool, _passport) {
     dbOptions = _dbOptions;
@@ -36,10 +45,20 @@ async function init(app,_dbOptions, _dbPool, _passport) {
     app.use(flash())
     const TWO_HOURS = 1000 * 60 * 60 * 2
     // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
+    const TWO_HOURS = 1000 * 60 * 60 * 2
+    // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
     app.use(session({
+        name: process.env.SESSION_NAME,
         name: process.env.SESSION_NAME,
         secret: process.env.SESSION_SECRET,
         resave: false,
+        saveUninitialized: false,
+        store: sessionStore,
+        cookie: {
+            //maxAge: TWO_HOURS,
+            sameSite: 'Lax',
+            secure: process.env.NODE_ENV === 'production' // setting secure to true breaks session functionality, but why? Also, it should be fine as long as the server is running on https
+        }
         saveUninitialized: false,
         store: sessionStore,
         cookie: {
@@ -64,6 +83,13 @@ async function init(app,_dbOptions, _dbPool, _passport) {
             console.log(await req.isAuthenticated());
             const loggedIn = await req.isAuthenticated();
             res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(loggedIn)})
+            let currentUser = "";
+            const authenticated = await req.isAuthenticated();
+            if ( authenticated && req.user != undefined) {
+                currentUser = req.user;
+            }
+            console.log(await req.isAuthenticated());
+            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser)})
           
         } catch (err) {
             console.error(err);
@@ -95,6 +121,17 @@ async function init(app,_dbOptions, _dbPool, _passport) {
           });
         })(req, res, next);
       });
+    app.post('/login', (req, res, next) => {
+        passport.authenticate('local', (err, user, info) => {
+          if (err) return next(err);
+          if (!user) return res.redirect('/login');
+      
+          req.logIn(user, (err) => {
+            if (err) return next(err);
+            return res.redirect('/');
+          });
+        })(req, res, next);
+      });
 
     app.get('/register', returnToHomepageIfAuthenticated, async (req, res)  =>  {
         const loggedIn = await req.isAuthenticated();
@@ -108,9 +145,14 @@ async function init(app,_dbOptions, _dbPool, _passport) {
                 res.json({err: err.toString()}).status(500).send();
             }
 
+            const registerRES = await dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
             if (typeof(registerRES)==='string' || registerRES===undefined) { // register user will return a string if it fails
                 res.redirect('/login');
+                res.redirect('/login');
                 //res.pos // use socket to send error messages
+            } else {
+                console.log("Registered user: ", registerRES);
+                res.redirect('/login');
             } else {
                 console.log("Registered user: ", registerRES);
                 res.redirect('/login');
@@ -140,7 +182,23 @@ async function init(app,_dbOptions, _dbPool, _passport) {
                 console.error(err);
             }
             res.render('publicUserPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false)});
+        
+        try {
+            try {
+                const requestedUserPrivate = await dbUtils.getUserByUsername(dbPool, username);
+                const requestedUserID = requestedUserPrivate.id;
+                const requestedUser = await dbUtils.getPublicUserInfo(dbPool, requestedUserID);
+                console.log(req.isAuthenticated(), requestedUser);
+                if (req.isAuthenticated() && requestedUser.username==req.user.username) {
+                    res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true)});
+                    return;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+            res.render('publicUserPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false)});
         } catch (err) {
+            console.error(err);
             console.error(err);
             res.status(500);
             return;
@@ -180,6 +238,7 @@ async function init(app,_dbOptions, _dbPool, _passport) {
             const { channelId, threadId } = req.params;
             console.error(`Failed to fetch thread #${channelId} of channel #${threadId}`, err);
             res.status(500).send();
+            return;
         }
     });
 }

@@ -134,6 +134,7 @@ function loadThreads(threads) {
     const threadsHolder = document.getElementById("channelThreadsHolder");
     // delete old threads
     threadsHolder.innerHTML = '';
+    createStagingThread(); // recreate staging thread bc we just deleted it
 
     // first destroy ul list if it exists
     // add UL list

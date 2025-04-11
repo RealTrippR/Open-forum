@@ -19,12 +19,15 @@ const dbOptions = {
     database: process.env.MYSQL_DATABASE
 }
 const dbPool =  mysql.createPool(dbOptions).promise()
+}
+const dbPool =  mysql.createPool(dbOptions).promise()
 
 
 // init passport system
 import { initialize } from './passport-config.js'
 initialize(
     dbPool,
+    passport
     passport
 );
 
@@ -37,6 +40,7 @@ const channels = await dbUtils.getChannels(dbPool);
 dbUtils.addThreadToChannel(dbPool, 0, "Test Thread", "A thead for testing purposes", channels[0].id)
 
 import router from '../Routers/router.js'
+await router.init(app,dbOptions,dbPool, passport);
 await router.init(app,dbOptions,dbPool, passport);
 import dbAPI from '../Routers/databaseAPI.js'
 await dbAPI.init(app,dbPool)
