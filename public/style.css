@@ -200,12 +200,17 @@ div.channelNameHeader {
     flex-grow: 1;             /* Fill available space if needed */
     overflow-x: auto;         
     scrollbar-width: thin;    /* Firefox scrollbar style */
+    flex-direction: column-reverse; /* makes ul grow upwards */
+    bottom: calc(var(--chatTypeBoxHeight) + 50px);
+    position: fixed;
+    width: calc(100% - var(--channelBarWidth) - 30px - 300px ); /* - 60px -> should be margin x 2*/ 
 }
 
 .threadMessagesHolder ul li {
     border: var(--stdBorder);
     padding: 5px;
     margin: 2px;
+    margin-left: 0px;
     font-size: 20px;
     font-family: var(--stdMinorFontFamily);
     color: var(--mainTextColor);
