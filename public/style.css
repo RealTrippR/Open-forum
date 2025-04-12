@@ -191,6 +191,32 @@ div.channelNameHeader {
     padding: 0px;
 }
 
+.threadMessagesHolder ul {
+    list-style: none;         /* Removes default bullets */
+    margin: 0;
+    gap: 10px;                /* Space between list items */
+    align-items: center;
+    background-color: transparent;
+    flex-grow: 1;             /* Fill available space if needed */
+    overflow-x: auto;         
+    scrollbar-width: thin;    /* Firefox scrollbar style */
+}
+
+.threadMessagesHolder ul li {
+    border: var(--stdBorder);
+    padding: 5px;
+    margin: 2px;
+    font-size: 20px;
+    font-family: var(--stdMinorFontFamily);
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    background-color: color-mix(in srgb, var(--navBarColor) 95%, white);;
+}
+
+.threadMessagesHolder ul li:nth-child(2n) {
+    background-color: var(--navBarColor);
+}
+
 /*--------------------------------------------*/
 /*CHAT BOX*/
 div.chatTypeDiv {

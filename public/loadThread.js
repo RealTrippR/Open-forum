@@ -1,4 +1,4 @@
-async function getThreadMessagesFromServer(threadID) {
+async function getThreadMessagesFromServer(channelID, threadID) {
     return (async () => {
     try {
         const res = await fetch('/api-get-messages-from-thread', {
@@ -6,7 +6,7 @@ async function getThreadMessagesFromServer(threadID) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ threadID })
+            body: JSON.stringify({ channelID, threadID })
         });
 
         if (!res.ok) {
@@ -24,7 +24,11 @@ async function getThreadMessagesFromServer(threadID) {
 }
 
 function sendMessage(message) {
-    socket.emit('message', message);  // Emit message to server
+    socket.emit('send-message', {message: message, channelID: window.currentChannel.id, threadID: window.currentThreadID});  // Emit message to server
+
+    // add it to the message list
+
+    addMessageToMessageHolder(message);
 }
 
 
@@ -32,10 +36,10 @@ function getCurrentThreadID() {
     return window.currentThreadID;
 }
 
-function addMessageToMessageHolder(message) {
+function addMessageToMessageHolder(message, messageDate, messageOwnerID) {
     const msgUL = document.getElementById('message-UL');
 
-    msgUL.innerHTML = '';
+    //msgUL.innerHTML = '';
     msgUL.innerHTML += `<li> ${message} </li>`
     
 }
@@ -51,14 +55,14 @@ async function loadThreadFromID(threadID) {
     threadsHolder.style.display = 'none';
 
     // load the messages
-    const res = await getThreadMessagesFromServer(threadID);
+    const res = await getThreadMessagesFromServer(window.currentChannel.id,threadID);
     const threadMessages = res.messages;
 
     console.log('Loaded messages of threadID: ', threadID);
     console.log('Messages: ', threadMessages);
 
     for (let message of threadMessages) {
-        addMessageToMessageHolder(message)
+        addMessageToMessageHolder(message.content, message.date, message.ownerID)
     }
 
     return threadMessages;
@@ -95,7 +99,13 @@ function initMessageHolder() {
     chatTypeBoxDiv.appendChild(msgHolder);
 
     const sendButton = document.getElementById("send-button");
-    document.addEventListener('click', () => {
+
+    chatTypeBoxDiv.addEventListener('keydown', (key)=> {
+        if (key == 'enter') {
+            sendButton.click();
+        }
+    })
+    sendButton.addEventListener('click', () => {
         sendMessage(msgHolder.value)
         msgHolder.value = '';
     });
@@ -103,6 +113,8 @@ function initMessageHolder() {
 }
 
 function setCurrentThread(threadID) {
+    window.currentThreadID = threadID;
+
     for (const thread in window.currentChannel.threads) {
         if (thread.id == threadID) {
             window.currentThread = thread;
@@ -112,9 +124,9 @@ function setCurrentThread(threadID) {
 
 
     const threadsHolder = document.getElementById("channelThreadsHolder");
-    threadsHolder.style.display = 'none'; // make visible
+    threadsHolder.style.display = 'none';  // make message holder invis
     const msgHolder = document.getElementById('threadMessagesHolder');
-    msgHolder.style.display = 'inline';     // make message holder invis
+    msgHolder.style.display = 'inline'; // make visible
 
     msgHolder.innerHTML = ''; // clear existing messages
     msgHolder.innerHTML += '<UL id="message-UL"> </UL>' // the list where the actual messages are stored

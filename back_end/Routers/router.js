@@ -40,8 +40,10 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
     app.use(express.urlencoded({extended: false}))
     app.use(flash())
     const TWO_HOURS = 1000 * 60 * 60 * 2
+
     // https://darifnemma.medium.com/how-to-store-session-in-mysql-database-using-express-mysql-session-ae2f67ef833e
-    app.use(session({
+
+    const middleWare = session({
         name: process.env.SESSION_NAME,
         secret: process.env.SESSION_SECRET,
         resave: false,
@@ -52,7 +54,38 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             sameSite: 'Lax',
             secure: process.env.NODE_ENV === 'production' // setting secure to true breaks session functionality, but why? Also, it should be fine as long as the server is running on https
         }
-    }));
+    })
+
+    /*********************************************************/
+    /* SOCKET IO */
+
+    function onlyForHandshake(middleware) {
+        return (req, res, next) => {
+            const isHandshake = req._query.sid === undefined;
+            if (isHandshake) {
+            middleware(req, res, next);
+            } else {
+            next();
+            }
+        };
+    }
+        
+    io.engine.use(onlyForHandshake(middleWare));
+    io.engine.use(onlyForHandshake(passport.session()));
+    io.engine.use(
+        onlyForHandshake((req, res, next) => {
+            if (req.user) { // check if logged in
+            next();
+            } else { // if not logged in, return 401 Unauthorized error
+            res.writeHead(401);
+            res.end();
+            }
+        }),
+    );
+
+    /*********************************************************/
+
+    app.use(middleWare);
     app.use(passport.initialize());
     app.use(passport.session());
     /******************** */
@@ -200,7 +233,25 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
     /* SOCKET IO */
     
     io.on('connection', (socket) => {
-        console.log('a user connected');
+        console.log('A user connected');
+        socket.on('send-message', async (req) => {
+            try {
+                const privateUser = await dbUtils.getUserByUsername(dbPool, socket.request.user.username);
+                const reqUserID = privateUser.id;
+                await dbUtils.addMessageToThread(dbPool, req.channelID, req.threadID, reqUserID, req.message);
+        
+                const publicUserInfo = await dbUtils.getPublicUserInfo(dbPool, reqUserID);
+        
+                socket.broadcast.emit('new-message', {
+                    message: req.message,
+                    userInfo: publicUserInfo
+                });
+
+            } catch (err) {
+                console.error("Error handling send-message:", err);
+                socket.emit('error', 'Failed to send message.');
+            }
+        })
     });
 
 }

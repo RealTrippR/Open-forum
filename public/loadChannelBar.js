@@ -56,6 +56,10 @@ function setCurrentChannel(channel) {
         window.currentChannel.threads = await getThreadsFromServer(window.currentChannel.id);
         loadThreads(window.currentChannel.threads);
     })();
+
+    const msgChatBox = document.getElementById('chatTypeDiv')
+    // hide message chat box
+    msgChatBox.style.display = 'none';
 }
 
 function setCurrentChannelFromButton() {

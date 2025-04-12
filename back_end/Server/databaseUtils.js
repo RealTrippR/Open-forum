@@ -167,6 +167,8 @@ async function createMessageTableForThread(dbPool, channelID, threadID) {
         date DATETIME
     )
     `
+
+    await dbPool.query(createTableQuery);
 }
 
 function getMessageTableNameFromThread(threadID, channelID) {
@@ -420,17 +422,42 @@ async function updateUserDescription(dbPool, newUserDescription, userID) {
 }
 
 async function getMessagesFromThread(dbPool, channelID, threadID) {
-    if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
-    if (channelID === undefined) { throw new Error('channelID is required as an argument')}
-    if (threadID === undefined) { throw new Error('threadID is required as an argument')}
-
     try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+
         
-        const query = ``;
+        const messageTableName = getMessageTableNameFromThread(threadID,channelID);
+        const query = `SELECT * FROM ${messageTableName};`;
+
+        const [rows] = await dbPool.query(query);
+        return rows;
 
     } catch (err) {
         console.error("Failed to get messages from thread: ", err);
         return undefined;
+    }
+}
+
+async function addMessageToThread(dbPool, channelID, threadID, userID, messageContent) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+        if (userID === undefined) { throw new Error('userID is required as an argument')}
+        if (messageContent === undefined) { throw new Error('messageContent is required as an argument')}
+
+        const threadMessageTableName = getMessageTableNameFromThread(threadID, channelID);
+        const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, date) VALUES (?, ?, ?)`
+
+        const now = new Date();
+        const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
+
+        await dbPool.query(query, [userID, messageContent, datetime]);
+    } catch (err) {
+        console.error(err);
+        return new Error("Failed to add message to thread" + err.toString())
     }
 }
 
@@ -439,4 +466,5 @@ export default {
     isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
     createChannel, getChannels, addThreadToChannel, getThreadsFromChannel,
     getDescriptionFromChannel, getPublicUserInfo, updateUserName, updateUserDescription,
+    getMessagesFromThread, addMessageToThread
 };

@@ -127,19 +127,17 @@ async function init(app, _dbPool) {
 
     app.post('/api-get-messages-from-thread', async(req,res) => {
         try {
-            const {threadID} = req.body;
+            const body = req.body;
             
             //console.log("THREAD ID: ", req);
 
-            const messages = ['test-res, modify databaseAPI to work properly'];
+            //const messages = ['test-res, modify databaseAPI to work properly'];
+            const messages = await dbUtils.getMessagesFromThread(dbPool, body.channelID, body.threadID);
             res.status(200).json({messages: messages}).send();
         } catch (err) {
             console.error("Failed to get thread messages: ", err);
             res.status(500).send();
         }
-    });
-    app.post('/api-add-message-to-thread', async(req,res) => {
-        
     });
 }
 

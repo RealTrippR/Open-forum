@@ -170,5 +170,6 @@ function loadThreads(threads) {
 
         // more data, including the user that made it and date of creation
         threadsHolder.appendChild(thh);
+        
     }
 }
