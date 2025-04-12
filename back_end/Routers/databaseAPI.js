@@ -25,7 +25,7 @@ async function init(app, _dbPool) {
             const description = await dbUtils.getDescriptionFromChannel(dbPool, channelID);
             res.status(200).json({threads: threads, description: description}).send();
         } catch (err) {
-            //console.error(err);
+            console.error(err);
             res.status(500).send();
         }
     });

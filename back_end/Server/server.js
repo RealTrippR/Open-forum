@@ -36,7 +36,7 @@ initialize(
     passport
 );
 
-await dbUtils.clearDB(dbPool, true);
+await dbUtils.clearDB(dbPool, false);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
@@ -52,14 +52,6 @@ await dbAPI.init(app,dbPool)
 dbUtils.getChannels(dbPool);
 
 await dbUtils.registerUser(dbPool, 'w@w', 'w', "w", "my description! A max of 256 characters");
-
-
-io.engine.on("connection_error", (err) => {
-    console.log(err.req);      // the request object
-    console.log(err.code);     // the error code, for example 1
-    console.log(err.message);  // the error message, for example "Session ID unknown"
-    console.log(err.context);  // some additional error context
-  });
 
 // Start the server
 server.listen(PORT, () => {

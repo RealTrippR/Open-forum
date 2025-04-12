@@ -32,9 +32,9 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
     app.set('view engine', 'ejs')
     //app.engine('html', ejs.renderFile)
     app.use(express.static('public'));  // Ensure that static files are inside a "public" folder
-    //app.use(express.static('socket-io'));  // Ensure that static files are inside a "public" folder
+    app.use(express.static('socket-io'));  // Ensure that static files are inside a "public" folder
 
-    //app.use(express.json());
+    app.use(express.json());
     
     // init passport
     app.use(express.urlencoded({extended: false}))
@@ -195,6 +195,14 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             return;
         }
     });
+    
+    /******************************************************** */
+    /* SOCKET IO */
+    
+    io.on('connection', (socket) => {
+        console.log('a user connected');
+    });
+
 }
 
 function returnToHomepageIfAuthenticated (req,res,next) {
@@ -206,15 +214,6 @@ function returnToHomepageIfAuthenticated (req,res,next) {
     } catch {
         next();
     }
-
-
-
-
-    /******************************************************** */
-    /* SOCKET IO */
-
- 
-
 }
 /*
 function checkAuthenticated(req, res, next) {

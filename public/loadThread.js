@@ -1,5 +1,3 @@
-const socket = io();
-
 async function getThreadMessagesFromServer(threadID) {
     return (async () => {
     try {
@@ -99,6 +97,7 @@ function initMessageHolder() {
     const sendButton = document.getElementById("send-button");
     document.addEventListener('click', () => {
         sendMessage(msgHolder.value)
+        msgHolder.value = '';
     });
 
 }

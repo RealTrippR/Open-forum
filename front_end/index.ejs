@@ -13,8 +13,12 @@
 <div id="channelThreadsHolder" class="channelThreadsHolder"> </div> <!-- thread header buttons are stored here -->
 <div id="threadMessagesHolder" class="threadMessagesHolder" style="display: none;"> </div> <!-- holds the messages for the current thread-->
 <div id="channelNameHeader" class="channelNameHeader"> </div>
-<script> const SOCKET_IO_PORT = 8080 </script>
+<!-- init socket.io -->
 <script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+</script>
+<!-- load webpage content -->
 <script src="/loadNavbar.js"> </script>
 <script src="/loadThread.js"> </script>
 <script src="/loadChannelBar.js"> </script>
