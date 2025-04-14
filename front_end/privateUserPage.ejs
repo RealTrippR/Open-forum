@@ -19,7 +19,6 @@
     const isPrivatePage = <%- JSON.stringify(isPrivatePage) %>
     window.onload = function() {
         window.user = <%- user %>
-        window.user = <%- user %>
         loadNavbar();
         loadUserPage(JSON.stringify(isPrivatePage),window.user);
     };

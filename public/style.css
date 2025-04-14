@@ -137,11 +137,24 @@ li.channelBarHandleButton p:hover{
     transform: translate(1px, 1px);
 }
 
-.channelThreadsHolder {
+/*contains the create thread button, thread view counter, sort, and created by info*/
+.channelInfoBarHolder {
     position: absolute;
     top: 84px;
     left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth));
+    min-width: var(300px);
+    background-color: var(--backgroundColor);
+    border: 1px solid black;
+    padding: 0px;
+    display: flex;
+}
+
+.channelThreadsHolder {
+    position: absolute;
+    top: 112px;
+    left: var(--channelBarWidth);
+    width: calc(100% - var(--channelBarWidth) - 270px);
     min-width: var(300px);
     background-color: var(--backgroundColor);
     border: 1px solid black;
@@ -180,46 +193,89 @@ div.channelNameHeader {
 /*--------------------------------------------*/
 /*MESSAGES*/
 .threadMessagesHolder {
-    position: absolute;
+    position: relative; /* Parent positioning context */
+    overflow-y: auto;
+    position: absolute ;
     top: 84px;
     left: var(--channelBarWidth);
-    width: calc(100% - var(--channelBarWidth));
+    width: calc(100% - var(--channelBarWidth) - 270px);
     margin-bottom: var(--chatTypeBoxHeight);
     min-width: var(300px);
     background-color: var(--backgroundColor);
     border: 1px solid black;
     padding: 0px;
+    height: calc(100% - 84px);
 }
-
 .threadMessagesHolder ul {
-    list-style: none;         /* Removes default bullets */
+    display: flex;
+    flex-direction: column; /* Messages grow upwards */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    list-style: none;
     margin: 0;
-    gap: 10px;                /* Space between list items */
-    align-items: center;
-    background-color: transparent;
-    flex-grow: 1;             /* Fill available space if needed */
-    overflow-x: auto;         
-    scrollbar-width: thin;    /* Firefox scrollbar style */
-    flex-direction: column-reverse; /* makes ul grow upwards */
-    bottom: calc(var(--chatTypeBoxHeight) + 50px);
-    position: fixed;
-    width: calc(100% - var(--channelBarWidth) - 30px - 300px ); /* - 60px -> should be margin x 2*/ 
+    padding: 10px;
+    width: 100%;
+    max-height: calc(100% - 100px);
 }
 
 .threadMessagesHolder ul li {
+    position: relative;
+    display: flex;
     border: var(--stdBorder);
-    padding: 5px;
+    padding: 3px;
     margin: 2px;
     margin-left: 0px;
     font-size: 20px;
     font-family: var(--stdMinorFontFamily);
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
-    background-color: color-mix(in srgb, var(--navBarColor) 95%, white);;
+    background-color: color-mix(in srgb, var(--navBarColor) 95%, white);
+
+    min-width: 300px;
+    width: calc(100% - 30px);
+}
+
+.msg-text {
+    position: relative;
+    margin-top: 15px;   /* 10px from the top of the parent */
+    left: 5px;  /* 20px from the left of the parent */
+    font-size: 26px;
+    display: block;     /* block makes it easier to wrap properly */
+    white-space: normal; /* ensures wrapping */
+    word-wrap: break-word; /* break long words if needed */
+    max-width: calc(100% - 100px); /* prevents it from overflowing */
+    
+}
+
+.msg-username {
+    position: absolute;
+    top: 5px;   /* 10px from the top of the parent */
+    left: 55px;  /* 20px from the left of the parent */
+    font-size: 10px;
+    display: inline-block;
+}
+
+.msg-date {
+    position: absolute;
+    top: 5px;   /* 10px from the top of the parent */
+    left: 55px;  /* 20px from the left of the parent */
+    font-size: 10px;
+    display: inline-block;
 }
 
 .threadMessagesHolder ul li:nth-child(2n) {
     background-color: var(--navBarColor);
+}
+
+.threadMessagesProfileDiv {
+    width: 45px;
+    height: 45px;
+    border: var(--stdBorder);
+}
+
+.threadMessagesProfileDiv img {
+    padding: 0px;
+    box-shadow: var(--stdMinorShadow);
 }
 
 /*--------------------------------------------*/
@@ -290,6 +346,10 @@ div.chatTypeDiv {
 
 }
 
+#pfp-img:hover {
+    filter: brightness(0.5) saturate(1.5);
+}
+
 /*--------------------------------------------*/
 /*GENERAL*/
 
@@ -300,5 +360,6 @@ div.chatTypeDiv {
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
     text-decoration: none;
+    font-family: var(--stdMinorFontFamily);
     font-weight: 400;
 }

@@ -1,5 +1,22 @@
-function updatePfp(pfpImageFile) {
-
+function askServerToUpdatePFP(formData) { // formdata must have a 'profilePicture' in it
+    if (formData==undefined) {
+        console.error("Could not update profile picture, invalid data");
+        return;
+    }
+    fetch('/api-update-pfp',
+    {
+        method: 'POST',
+        body: formData
+    })
+    .then((res) => {
+        if (!res.ok) {
+            throw new Error('Bad sever response');
+        }
+    })
+    .then((json) => {
+    })
+    .catch(error => {
+    });
 }
 
 function requestLogout() {
@@ -86,14 +103,16 @@ function loadUserPage(private, userInfo) {
     
     let pfpImgSrc = "\\icons\\default-pfp.png";
 
-    if (userInfo.profilePicture == null) {
-        pfpImgSrc = userInfo.profilePicture;
+    if (userInfo.hasProfilePicture == true) {
+        pfpImgSrc = `\\profile-pictures\\${userInfo.username}.jpg`
     }
 
-    
-    // profile picture  
-    HTML += `<img src="\\icons\\default-pfp.png" id="pfp-img" width="150" height="150" id="profilePic" style="padding: 10px">`
+    // invis file uploader
+    HTML += '<input type="file" id="upload-pfp-button" style="display: none">';
 
+
+    // profile picture  
+    HTML += `<img src="${pfpImgSrc}" id="pfp-img" width="150" height="150" id="profilePic" style="padding: 10px">`
     // username div
     HTML += `
     <div 
@@ -140,6 +159,7 @@ function loadUserPage(private, userInfo) {
 
     // setup button events
     const editUsernameButton = document.getElementById('edit-username-button');
+    console.log('editUsernameButton: ', editUsernameButton);
     editUsernameButton.addEventListener('click', () => {
         const usernameDiv = document.getElementById('usernameDiv');
         if (usernameDiv.contentEditable) {
@@ -160,10 +180,17 @@ function loadUserPage(private, userInfo) {
 
     usernameDiv.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+            if (usernameDiv.innerText == window.user.username)  {
+                return; // don't send a request if the username wasn't changed
+            }
             e.preventDefault(); // prevent newline
             usernameDiv.contentEditable = false;
 
+            console.error('Currently there is no check or alert if updateUsername fails, be sure to add this')
             updateUsername(usernameDiv.innerText);
+            window.user.username = usernameDiv.innerText;
+
+            window.history.pushState({}, '', `/users/${ window.user.username}`);
         }
     });
 
@@ -196,14 +223,40 @@ function loadUserPage(private, userInfo) {
         }
     });
 
+    const uploadPFPbutton = document.getElementById('upload-pfp-button');
+    uploadPFPbutton.addEventListener('change', () => {
+        const file = event.target.files[0];
+        
+        const validType = file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')  || file.name.toLowerCase().endsWith('.jpeg');
+        
+        if (file && validType && file.size <= 200000 /*200 KB or less*/) {
+            const formData = new FormData();
+            
+            
+              // Update the profile picture on the client before sending img to the server
+            const pfpImage = document.getElementById('pfp-img');
+            pfpImage.src = URL.createObjectURL(file); 
+
+            formData.append('profilePicture', file);  // 'profilePicture' is the key the server will use to retrieve the file
+            askServerToUpdatePFP(formData);
+        } else {
+            alert('Invalid image, must be a PNG or JPEG and less than 200 KB in size.')
+        }        
+    });
+
+
+    const pfpImage = document.getElementById('pfp-img');
+    pfpImage.addEventListener('click', () => {
+        const uploadPFPbutton = document.getElementById('upload-pfp-button');
+        uploadPFPbutton.click();
+    });
 
 
 
-    HTML = userInfoContainer.innerHTML;
 
-    HTML+='<BUTTON id="logout-button" style="margin: 5px; padding: 5px"> Logout </BUTTON>'
 
-    userInfoContainer.innerHTML = HTML;
+    // this is need because adding directly to innerHTML breaks the DOM
+    userInfoContainer.insertAdjacentHTML('beforeend', '<BUTTON id="logout-button" style="margin: 5px; padding: 5px"> Logout </BUTTON>');
 
 
     const logoutButton = document.getElementById('logout-button');

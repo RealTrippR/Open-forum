@@ -7,6 +7,11 @@ import express from 'express'
 const app = express();
 const PORT = process.env.SERVER_PORT;
 
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import sharp from 'sharp';
+import formidable from 'formidable';
+import path from 'path';
 let dbPool;
 
 // note that the server must already be started before this is called
@@ -136,6 +141,99 @@ async function init(app, _dbPool) {
             res.status(200).json({messages: messages}).send();
         } catch (err) {
             console.error("Failed to get thread messages: ", err);
+            res.status(500).send();
+        }
+        return;
+    });
+
+    app.post('/api-get-thread-message-count', async(req,res) => {
+        try {
+            const body = req.body;
+            
+            const count = await dbUtils.getMessageCountOfThread(dbPool, body.channelID, body.threadID);
+            res.status(200).json({count: count}).send();
+        } catch (err) {
+            console.error("Failed to get thread messages: ", err);
+            res.status(500).send();
+        }
+        return;
+    });
+
+    app.post('/api-update-pfp', async(req,res) => {
+        try {
+            const __dirname = path.dirname(fileURLToPath(import.meta.url));
+            if (req.isAuthenticated() == false) {
+                return res.status(401).send();
+            }
+            if (req.user == undefined) {
+                return res.status(400).send();
+            }
+
+            const form = formidable({
+                uploadDir: path.join(__dirname, '../../public/profile-pictures'), // folder to save uploaded files
+                keepExtensions: true,
+                maxFileSize: 200000, // 200 KB limit
+                multiples: false,
+            });
+            
+            const fileTypes = ['image/jpeg', 'image/png'];
+            form.onPart = part => {
+                if (fileTypes.indexOf(part.mimetype) === -1) {
+                    // Here is the invalid file types will be handled. 
+                    form._error(new Error('File type is not supported'));
+                    return res.send(500).send();
+                }
+                if (!part.filename || fileTypes.indexOf(part.mime) !== -1) {
+                    // Let formidable handle the non file-pars and valid file types
+                    form._handlePart(part);
+                }
+            };
+            
+
+            form.parse(req, function (err, fields, files) {
+                if (err) {
+                    console.error('Upload error:', err);
+                    return res.status(500).send('Upload failed');
+                }
+                
+                const uploadedFile = files.profilePicture[0];
+                if (!uploadedFile) {
+                    return res.status(400).send('No file uploaded');
+                }
+
+                // const ext = `${uploadedFile.filepath}`
+                // .split('.')
+                // .filter(Boolean) // removes empty extensions (e.g. `filename...txt`)
+                // .slice(1)
+                // .join('.')
+
+                const oldPath = uploadedFile.filepath;
+
+                let newPath = path.join(path.dirname(oldPath), `${req.user.username}`);
+                newPath = newPath += '.' + 'jpg';
+                
+                (async () => {
+                    try {
+                        await sharp(oldPath)
+                            .jpeg({ quality: 90 }) // Converts and compresses to JPG
+                            .toFile(newPath);
+                
+                        // Optionally delete the original file
+                        fs.unlinkSync(oldPath);
+                
+                        return res.status(200).send('Profile picture uploaded and converted to JPG.');
+                    } catch (conversionError) {
+                        console.error('Image conversion error:', conversionError);
+                        return res.status(500).send('Failed to convert image');
+                    }
+                })();
+            });
+
+            const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = user.id;
+            dbUtils.giveUserProfilePicture(dbPool, userID);
+        } catch (err) {
+            console.error("Failed to change profile picture: ", err);
             res.status(500).send();
         }
     });

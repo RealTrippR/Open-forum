@@ -47,7 +47,7 @@ function setCurrentChannel(channel) {
         let HTML = `<p class='stdText' style='font-weight: 600; font-size: 23px; margin: auto 0px; padding-left: 5px; text-align: left; '>${window.currentChannel.name}</p>`;
         HTML += `<p class='stdText' style='margin: auto 0px; font-size: 17px; padding-left: 15px; text-align: left;'> ${channel.description}</p>`
         //HTML += `<button style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="button" name="createThread"> Create Thread </button>`
-        HTML += `<input style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="text" placeholder="Search Threads"></input>`
+        //HTML += `<input style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="text" placeholder="Search Threads"></input>`
         channelNameHeader.innerHTML = HTML;
         
     }
@@ -60,6 +60,11 @@ function setCurrentChannel(channel) {
     const msgChatBox = document.getElementById('chatTypeDiv')
     // hide message chat box
     msgChatBox.style.display = 'none';
+
+
+    // make the thread info holder visible
+    const channelInfoHolder = document.getElementById('channelInfoBarHolder');
+    channelInfoHolder.style.display = 'flex';
 }
 
 function setCurrentChannelFromButton() {
@@ -107,6 +112,11 @@ function loadChannelBar() {
 
         const threads = await getThreadsFromServer(li.dataset.channelId)
         //console.log('Response from server:', threads);
-        loadThreads(threads);
+        //loadThreads(threads); // causes duplication error for some reason
     }
+
+
+    let channelInfoBarHolder = document.createElement('div');
+    channelInfoBarHolder.channelName = 'channelInfoBarHolder';
+    document.body.appendChild(channelInfoBarHolder);
 }

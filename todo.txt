@@ -1,0 +1,4 @@
+[ ] Limit chars in usernames to only numbers, underscores, dashes, and letters
+[ ] Add protection against brute force attacks
+[ ] 
+[ ] Improve UI design?

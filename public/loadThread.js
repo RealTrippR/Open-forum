@@ -1,3 +1,39 @@
+function getRelativeTimeStr(dateString) {
+    
+    let now = new Date();
+    now = new Date(now.toISOString())
+    console.log(dateString, ' - ', now.toISOString())
+
+    const messageTime = new Date(dateString);
+    const secondsAgo = Math.floor((now - messageTime) / 1000);
+    
+    if (secondsAgo < 60) {
+      return `Now`;
+    } else if (secondsAgo < 3600) {
+      const minutesAgo = Math.floor(secondsAgo / 60);
+      if (minutesAgo <= 1) { 
+        return `${minutesAgo} minute ago`;
+      } else {
+        return `${minutesAgo} minutes ago`;
+      }
+    } else if (secondsAgo < 86400) {
+      const hoursAgo = Math.floor(secondsAgo / 3600);
+      if (hoursAgo <= 1) { 
+        return `${hoursAgo} hour ago`;
+      } else {
+        return `${hoursAgo} hours ago`;
+      }
+    } else {
+      const daysAgo = Math.floor(secondsAgo / 86400);
+      if (daysAgo <= 1) { 
+        return `${daysAgo} day ago`;
+      } else {
+        return `${daysAgo} days ago`;
+      }
+    }
+  }
+
+
 async function getThreadMessagesFromServer(channelID, threadID) {
     return (async () => {
     try {
@@ -28,20 +64,63 @@ function sendMessage(message) {
 
     // add it to the message list
 
-    addMessageToMessageHolder(message);
+    const now = new Date();
+    const datetime = now.toISOString()
+    addMessageToMessageHolder(message, datetime, window.user);
 }
 
+function recieveMessageFromServer(req) {
+    const now = new Date();
+    const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
+    addMessageToMessageHolder(req.message, datetime, req.userInfo);
+}
 
 function getCurrentThreadID() {
     return window.currentThreadID;
 }
 
-function addMessageToMessageHolder(message, messageDate, messageOwnerID) {
+function addMessageToMessageHolder(message, messageDateTime, messageOwner) {
+    const relativeDate = getRelativeTimeStr(messageDateTime);
     const msgUL = document.getElementById('message-UL');
-
-    //msgUL.innerHTML = '';
-    msgUL.innerHTML += `<li> ${message} </li>`
     
+      
+    let pfpImgSrc = "\\icons\\default-pfp.png";
+
+    if (messageOwner.hasProfilePicture == true) {
+        pfpImgSrc = `\\profile-pictures\\${messageOwner.username}.jpg`
+    }
+    msgUL.innerHTML += `<li>
+    <div class = threadMessagesProfileDiv>
+    <img src='${pfpImgSrc}' width=45 height=45> </img> 
+    </div>
+    <span class="msg-username">${messageOwner.username}</span>
+    <span class="msg-date"> |  ${relativeDate}</span>
+
+    <span class="msg-text">${message}</span>
+    </li>`
+
+    const messageItems = document.querySelectorAll('.threadMessagesHolder ul li');
+
+    requestAnimationFrame(() => {
+        const messageItems = document.querySelectorAll('.threadMessagesHolder ul li');
+    
+        messageItems.forEach((item) => {
+            const dateSpan = item.querySelector('.msg-date');
+            const usernameSpan = item.querySelector('.msg-username');
+    
+            if (dateSpan && usernameSpan) {
+                const usernameWidth = usernameSpan.offsetWidth;
+                const usernameLeft = usernameSpan.offsetLeft;
+    
+                dateSpan.style.position = 'absolute';
+                dateSpan.style.left = `${usernameLeft + usernameWidth + 4}px`;
+            }
+        });
+    });
+    
+    if (Math.abs(msgUL.scrollTop - msgUL.scrollHeight) < 2000) {
+        msgUL.scrollTop = msgUL.scrollHeight;
+    }
 }
 
 // opens the thread by ID
@@ -62,7 +141,7 @@ async function loadThreadFromID(threadID) {
     console.log('Messages: ', threadMessages);
 
     for (let message of threadMessages) {
-        addMessageToMessageHolder(message.content, message.date, message.ownerID)
+        addMessageToMessageHolder(message.content, message.date,{id: message.ownerID, username: message.ownerUsername, hasProfilePicture: message.ownerHasProfilePicture});
     }
 
     return threadMessages;
@@ -100,19 +179,28 @@ function initMessageHolder() {
 
     const sendButton = document.getElementById("send-button");
 
-    chatTypeBoxDiv.addEventListener('keydown', (key)=> {
-        if (key == 'enter') {
+    msgHolder.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
             sendButton.click();
         }
-    })
-    sendButton.addEventListener('click', () => {
-        sendMessage(msgHolder.value)
-        msgHolder.value = '';
     });
 
+    sendButton.addEventListener('click', () => {
+        if (msgHolder.value.length != 0) { // cannot send a blank message
+            sendMessage(msgHolder.value)
+            msgHolder.value = '';
+        }
+    });
 }
 
 function setCurrentThread(threadID) {
+
+    if (window.currentThreadID) {
+        socket.off(`#${window.currentThreadID}new-chat-message`);
+    }
+
+    socket.on(`#${threadID}new-chat-message`, recieveMessageFromServer)
+
     window.currentThreadID = threadID;
 
     for (const thread in window.currentChannel.threads) {
@@ -125,6 +213,9 @@ function setCurrentThread(threadID) {
 
     const threadsHolder = document.getElementById("channelThreadsHolder");
     threadsHolder.style.display = 'none';  // make message holder invis
+    const channelInfoHolder = document.getElementById('channelInfoBarHolder');
+    channelInfoHolder.style.display = 'none';
+    
     const msgHolder = document.getElementById('threadMessagesHolder');
     msgHolder.style.display = 'inline'; // make visible
 

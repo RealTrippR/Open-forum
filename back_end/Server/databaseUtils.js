@@ -1,6 +1,6 @@
 import bcrypt, { hash } from 'bcrypt'
 import mysql from 'mysql2'
-
+import fs from 'fs'
 
 async function initDB(dbPool) {
     if (dbPool === undefined) {
@@ -8,6 +8,7 @@ async function initDB(dbPool) {
     }
     try {
         await dbPool.query(`use ${process.env.MYSQL_DATABASE}`)
+
         const USERcreateTableQuery = `
         CREATE TABLE IF NOT EXISTS ${process.env.MYSQL_USER_TABLE} (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -15,7 +16,7 @@ async function initDB(dbPool) {
             email VARCHAR(256) NOT NULL,
             password VARCHAR(128) NOT NULL,
             description VARCHAR(256) NOT NULL DEFAULT "",
-            profilePicture LONGBLOB DEFAULT NULL,
+            hasProfilePicture INT NOT NULL DEFAULT 0,
             registerDate DATETIME NOT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
@@ -64,26 +65,37 @@ async function initChannels(dbPool) {
     }
 }
 
-async function clearDB(dbPool, clearSessions = true)
+async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearUsers = true)
 {
+    if (clearUsers) {
+        const pfpDir = 'public/profile-pictures';
+        if (fs.existsSync(pfpDir)){
+            // clear profile pictures
+            fs.rmSync(pfpDir, { recursive: true, force: true });
+        }
+
+        // recreate pfp folder
+        fs.mkdirSync(pfpDir);
+    }
+
     const channels = await getChannels(dbPool);
     if (channels !== undefined) {
         for (let channel of channels) {
-            // delete messages for all threads in that channel
-            const threads = await getThreadsFromChannel(dbPool,channel.id);
-            for (let thread of threads) {
-                const threadMessageTableName = getMessageTableNameFromThread(thread.id, channel.id);
-                const deleteMsgTableQuery = `DROP TABLE IF EXISTS ${threadMessageTableName}`;
-                await dbPool.query(deleteMsgTableQuery);
+            if (clearThreads) {
+                // delete messages for all threads in that channel
+                const threads = await getThreadsFromChannel(dbPool,channel.id);
+
+                for (let thread of threads) {
+                    const threadMessageTableName = getMessageTableNameFromThread(thread.id, channel.id);
+                    const deleteMsgTableQuery = `DROP TABLE IF EXISTS ${threadMessageTableName}`;
+                    await dbPool.query(deleteMsgTableQuery);
+                }
+            
+                // delete channel thread table
+                const threadTableName = getThreadTableNameFromChannelID(channel.id);
+                const deleteThreadTableQuery = `DROP TABLE IF EXISTS ${threadTableName}`;
+                await dbPool.query(deleteThreadTableQuery);
             }
-           
-
-            // delete channel thread table
-            const threadTableName = getThreadTableNameFromChannelID(channel.id);
-            const deleteThreadTableQuery = `DROP TABLE IF EXISTS ${threadTableName}`;
-            await dbPool.query(deleteThreadTableQuery);
-
-          
         }
     }
 
@@ -93,11 +105,12 @@ async function clearDB(dbPool, clearSessions = true)
     }
     // select the FORUM database
     await dbPool.query(`use ${process.env.MYSQL_DATABASE}`)
-    // delete all from database
-    const deleteAllUsersQuery = `DROP TABLE IF EXISTS ${process.env.MYSQL_USER_TABLE};`;
-    console.log(deleteAllUsersQuery)
-    await dbPool.query(deleteAllUsersQuery)
 
+    if (clearUsers) {
+        // delete all from database
+        const deleteAllUsersQuery = `DROP TABLE IF EXISTS ${process.env.MYSQL_USER_TABLE};`;
+        await dbPool.query(deleteAllUsersQuery)
+    }
 
     const deleteAllChannelsQuery =  `DROP TABLE IF EXISTS ${process.env.MYSQL_CHANNEL_TABLE};`;
     await dbPool.query(deleteAllChannelsQuery)
@@ -359,6 +372,15 @@ async function getThreadsFromChannel(dbPool, channelID) {
    
     const getQuery = `SELECT * FROM ${getThreadTableNameFromChannelID(channelID)};`
     const [rows] = await dbPool.query(getQuery);
+    for (let row of rows) {
+        if (row.ownerID) {
+            const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
+            row.ownerUsername = publicUser.username;
+            row.ownerHasProfilePicture = publicUser.hasProfilePicture;
+        } else {
+            row.ownerUsername = 'error: undefined'
+        }
+    }
     return rows;
 }
 
@@ -384,7 +406,7 @@ async function getPublicUserInfo(dbPool, id) {
         myUser.username = privateUser.username;
         myUser.description = privateUser.description;
         myUser.Date = privateUser.registerDate;
-        myUser.Date = privateUser.registerDate;
+        myUser.hasProfilePicture = Boolean(privateUser.hasProfilePicture);
         return myUser;
     } catch (err) {
         console.error("Could not convert private user to public user: ", err);
@@ -399,9 +421,20 @@ async function updateUserName(dbPool, newUsername, userID) {
     try {
         if (newUsername === undefined) { throw new Error('newUsername is required as an argument');}
         if (userID === undefined) { throw new Error('userID is required as an argument');}
-        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET username = ? WHERE id = ?`
 
+        const oldUserInfo = await getPublicUserInfo(dbPool, userID);
+
+        if (newUsername == oldUserInfo.username) {
+            return;
+        }
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET username = ? WHERE id = ?`
         await dbPool.query(query, [newUsername, userID]);
+
+        // rename user pfp img, but only after a successful query
+        const oldUserPFPdir = `public/profile-pictures/${oldUserInfo.username}.jpg`;
+        // rename user pfp img, but only after a successful query
+        const newUserPFPdir = `public/profile-pictures/${newUsername}.jpg`;
+        fs.rename(oldUserPFPdir, newUserPFPdir, (err)=>{if (err) {console.error("Failed to update username:",err)}});
     } catch (err) {
         console.error("Failed to updateUsername: ", err);
     }
@@ -415,7 +448,7 @@ async function updateUserDescription(dbPool, newUserDescription, userID) {
         if (userID == undefined) {throw new Error('userID is required as an argument')}
 
         const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET description = ? WHERE id = ?`
-        await dbPool.query(query, [newUsername, newUserDescription]);
+        await dbPool.query(query, [newUserDescription, userID]);
     } catch (err) {
 
     }
@@ -432,6 +465,13 @@ async function getMessagesFromThread(dbPool, channelID, threadID) {
         const query = `SELECT * FROM ${messageTableName};`;
 
         const [rows] = await dbPool.query(query);
+        for (let row of rows) {
+            const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
+            row.ownerUsername = publicUser.username;
+            row.ownerHasProfilePicture = publicUser.hasProfilePicture;
+            const date = new Date(row.date);
+            row.date = date.toISOString();
+        }
         return rows;
 
     } catch (err) {
@@ -452,7 +492,9 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
         const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, date) VALUES (?, ?, ?)`
 
         const now = new Date();
+        //console.log('NOW: ', now.toISOString())
         const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
+        //console.log('DATE: ', datetime)
 
         await dbPool.query(query, [userID, messageContent, datetime]);
     } catch (err) {
@@ -461,10 +503,44 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
     }
 }
 
+
+async function getMessageCountOfThread (dbPool, channelID, threadID) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+
+        
+        const messageTableName = getMessageTableNameFromThread(threadID,channelID);
+        const query = `SELECT COUNT(*) FROM ${messageTableName};`;
+
+        const [rows] = await dbPool.query(query);
+        return rows[0]["COUNT(*)"];
+
+    } catch (err) {
+        console.error("Failed to get messages from thread: ", err);
+        return undefined;
+    }
+}
+
+async function giveUserProfilePicture(dbPool, userID) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (userID === undefined) { throw new Error('userID is required as an argument')}
+
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET hasProfilePicture = 1 WHERE id = ?`
+        await dbPool.query(query, [userID]);
+    } catch (err) {
+        console.log("Error updating user pfp: ", err)
+        return undefined;
+    }
+}
+
 export default {
     initDB, clearDB, initChannels, getChannelCount, registerUser, 
     isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
     createChannel, getChannels, addThreadToChannel, getThreadsFromChannel,
     getDescriptionFromChannel, getPublicUserInfo, updateUserName, updateUserDescription,
-    getMessagesFromThread, addMessageToThread
+    getMessagesFromThread, addMessageToThread, getMessageCountOfThread,
+    giveUserProfilePicture     
 };

@@ -170,28 +170,22 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         const { username } = req.params;
         
         try {
-            try {
-                const requestedUserPrivate = await dbUtils.getUserByUsername(dbPool, username);
-                const requestedUserID = requestedUserPrivate.id;
-                const requestedUser = await dbUtils.getPublicUserInfo(dbPool, requestedUserID);
-                const loggedIn = await req.isAuthenticated();
+            const requestedUserPrivate = await dbUtils.getUserByUsername(dbPool, username);
+            const requestedUserID = requestedUserPrivate.id;
+            const requestedUser = await dbUtils.getPublicUserInfo(dbPool, requestedUserID);
+            const loggedIn = await req.isAuthenticated();
 
-                if (req.isAuthenticated() && requestedUser.username==req.user.username) {
-                    res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true), loggedIn: JSON.stringify(loggedIn)});
-                    return;
-                }
-            } catch (err) {
-                console.error(err);
+            if (req.isAuthenticated() && requestedUser.username==req.user.username) {
+                res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true), loggedIn: JSON.stringify(loggedIn)});
+                return;
             }
             res.render('publicUserPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false)});
         } catch (err) {
             console.error(err);
-            console.error(err);
-            res.status(500);
+            res.status(500).send();
             return;
         }
     });
-
 
 
     app.post('/logout', (req, res) => {
@@ -236,13 +230,16 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         console.log('A user connected');
         socket.on('send-message', async (req) => {
             try {
+                if (req.message.length == 0) {
+                    return; // cannot send a blank message
+                }
                 const privateUser = await dbUtils.getUserByUsername(dbPool, socket.request.user.username);
                 const reqUserID = privateUser.id;
                 await dbUtils.addMessageToThread(dbPool, req.channelID, req.threadID, reqUserID, req.message);
         
                 const publicUserInfo = await dbUtils.getPublicUserInfo(dbPool, reqUserID);
-        
-                socket.broadcast.emit('new-message', {
+
+                socket.broadcast.emit(`#${req.threadID}new-chat-message`, {
                     message: req.message,
                     userInfo: publicUserInfo
                 });
