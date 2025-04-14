@@ -1,4 +1,6 @@
 [ ] Limit chars in usernames to only numbers, underscores, dashes, and letters
 [ ] Add protection against brute force attacks
-[ ] 
+[ ] Fix bug: currently users can only view there profile pages
 [ ] Improve UI design?
+[ ] Implement thread and message searching
+[ ] Use JWT for sessions instead of a server side DB

@@ -37,7 +37,7 @@ initialize(
     passport
 );
 
-await dbUtils.clearDB(dbPool, false, true, false);
+await dbUtils.clearDB(dbPool);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 

@@ -63,6 +63,7 @@ function createStagingThreadAndThreadInfoHolder() {
 
     const channelInfoHolder = document.getElementById("channelInfoBarHolder");
     channelInfoHolder.innerHTML = '';
+    channelInfoHolder.style.width = 'calc(100% - var(--channelBarWidth) - 270px)'
 
     if (window.loggedIn) {
         // create staging thread if it does not exist
@@ -107,16 +108,19 @@ function createStagingThreadAndThreadInfoHolder() {
         stagingThread.style.display = 'none';
         stagingThread.style.backgroundColor = 'var(--backgroundColor)'
         stagingThread.style.position = 'absolute';
-        stagingThread.style.top = '28px';  // pop above its parent
-        stagingThread.style.left = '0px';   // or whatever makes sense in your layout
-        stagingThread.style.zIndex = '10000'; // ensure it's on top
-        stagingThread.style.boxShadow = '0px 2px 8px rgba(0, 0, 0, 0.2)';
+        stagingThread.style.top = '28px'; 
+        stagingThread.style.left = '0px'; 
+        stagingThread.style.zIndex = '10000';
+        stagingThread.style.boxShadow = 'var(--stdShadow)';
 
         const nameInput = document.createElement("input");
         nameInput.id = 'nameInput';
+        nameInput.className = "threadHeaderTitle";
         nameInput.type = 'text';
         nameInput.textContent = "";
         nameInput.placeholder = "Enter Thread Name";
+        nameInput.style.fontSize = '25px';
+
         nameInput.style.backgroundColor = 'var(--navBarColor)';
         stagingThread.appendChild(nameInput);
 
@@ -125,11 +129,13 @@ function createStagingThreadAndThreadInfoHolder() {
 
         const descriptionInput = document.createElement("input");
         descriptionInput.id = 'descriptionInput';
-        descriptionInput.className = "threadHeaderTitle";
+        descriptionInput.className = "stdText";
         descriptionInput.type = 'text';
+        descriptionInput.style.textAlign = 'left';
         descriptionInput.textContent = "";
         descriptionInput.placeholder = "Enter Description";
         descriptionInput.style.backgroundColor = 'var(--navBarColor)';
+        descriptionInput.style.fontSize = '17px';
         
         stagingThread.appendChild(descriptionInput);
 
@@ -177,31 +183,6 @@ function createStagingThreadAndThreadInfoHolder() {
 
         channelInfoHolder.appendChild(div);
     }
-
-    {
-        const messageCountDiv = document.createElement('div');
-        const div = messageCountDiv;
-        div.id = 'threadListMessagesAndViewsSortDiv';
-        div.style.backgroundColor = 'var(--backgroundColor)'
-        div.style.height = '26px';
-        div.style.border = 'var(--stdBorder)'
-        div.style.display = 'flex'
-        div.style.width = '84px';
-        div.style.position = 'relative'
-        div.style.top = 'px';
-        
-
-        const messagesP = document.createElement('p');
-        messagesP.className = 'stdText';
-        messagesP.style.margin = 'auto 0px';
-        messagesP.style.marginLeft = '10px'
-        messagesP.style.fontSize = '17px'
-        messagesP.textContent = 'Search:'
-
-        div.appendChild(messagesP);
-
-        channelInfoHolder.appendChild(div);
-    }
     {
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
@@ -220,9 +201,18 @@ function createStagingThreadAndThreadInfoHolder() {
         searchInput.style.width = '315px'
         searchInput.style.textAlign = 'left';
         searchInput.style.fontSize = '17px';
-        searchInput.placeholder = 'Search Threads';
+        searchInput.placeholder = 'Search:';
 
         channelInfoHolder.appendChild(searchInput);
+
+
+        // add the search magnifying class icon
+        const searchIcon = document.createElement('img');
+        searchIcon = 'icons/256px-Magnifying_glass_icon.svg'
+        searchIcon.width = '20';
+        searchIcon.height = '20';
+
+        searchInput.appendChild(searchIcon);
     }
 }
 

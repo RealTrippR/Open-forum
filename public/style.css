@@ -2,7 +2,7 @@
     --channelBarWidth: 250px;
 
     --mainTextColor: #e5e2d9;
-    --backgroundColor: rgb(127, 147, 127);
+    --backgroundColor: rgb(115, 135, 125);
     --chatTypeBoxHeight: 40px;
     --navBarColor:  color-mix(in srgb, var(--backgroundColor) 90%, black);
     --stdHeaderFontFamily:"Times New Roman", Georgia, serif;
@@ -213,8 +213,9 @@ div.channelNameHeader {
     scrollbar-width: thin;
     list-style: none;
     margin: 0;
-    padding: 10px;
-    width: 100%;
+    margin-left: 10px;
+    padding: 0px;
+    width: calc(100% - 0px);
     max-height: calc(100% - 100px);
 }
 
