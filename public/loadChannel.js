@@ -1,5 +1,39 @@
 //import threads from '/loadThreads.js';
 
+function getRelativeTimeStr(dateString) {
+    
+    let now = new Date();
+    now = new Date(now.toISOString())
+
+    const messageTime = new Date(dateString);
+    const secondsAgo = Math.floor((now - messageTime) / 1000);
+    
+    if (secondsAgo < 60) {
+      return `Now`;
+    } else if (secondsAgo < 3600) {
+      const minutesAgo = Math.floor(secondsAgo / 60);
+      if (minutesAgo <= 1) { 
+        return `${minutesAgo} minute ago`;
+      } else {
+        return `${minutesAgo} minutes ago`;
+      }
+    } else if (secondsAgo < 86400) {
+      const hoursAgo = Math.floor(secondsAgo / 3600);
+      if (hoursAgo <= 1) { 
+        return `${hoursAgo} hour ago`;
+      } else {
+        return `${hoursAgo} hours ago`;
+      }
+    } else {
+      const daysAgo = Math.floor(secondsAgo / 86400);
+      if (daysAgo <= 1) { 
+        return `${daysAgo} day ago`;
+      } else {
+        return `${daysAgo} days ago`;
+      }
+    }
+  }
+
 function askServerToCreateThread(threadName, threadDescription) {
     fetch('/api-create-thread',
     {
@@ -26,6 +60,35 @@ function askServerToCreateThread(threadName, threadDescription) {
     .catch(error => {
         console.error('Fetch error:', error);
     });
+}
+
+async function askServerToDeleteThread(channelID, threadID) {
+    channelID = Number(channelID);
+    thread = Number(threadID);
+    if (channelID == undefined) {throw new Error('channelID is required as an argument!');}
+    if (threadID == undefined) {throw new Error('threadID is required as an argument!');}
+
+    try {
+        fetch('/api-delete-thread',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    channelID: channelID,
+                    threadID: threadID
+                })
+            })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error('Bad sever response: ', res);
+                }
+            })
+    } catch (err) {
+        console.error("Error requesting thread deletion: ", err);
+        return false;
+    }
 }
 
 async function getMessageCountOfThread(threadID) {
@@ -103,8 +166,9 @@ function createStagingThreadAndThreadInfoHolder() {
         // create staging thread
         const stagingThread = document.createElement('div');
         stagingThread.id = 'stagingThread'
-        stagingThread.className = 'threadHeaderHolder'
+        stagingThread.className = 'stagingThread'
         stagingThread.style.padding = '10px'
+        stagingThread.style.border = 'var(--stdBorder)'
         stagingThread.style.display = 'none';
         stagingThread.style.backgroundColor = 'var(--backgroundColor)'
         stagingThread.style.position = 'absolute';
@@ -177,7 +241,11 @@ function createStagingThreadAndThreadInfoHolder() {
         div.style.height = '26px';
         div.style.border = 'var(--stdBorder)'
         div.style.display = 'flex'
+        if (window.loggedIn) { 
         div.style.width = '790px';
+        } else {
+            div.style.width = `${790+210}px`;
+        }
         div.style.position = 'relative'
         div.style.top = 'px';
 
@@ -191,28 +259,58 @@ function createStagingThreadAndThreadInfoHolder() {
         searchInput.style.position = 'relative'
         searchInput.style.backgroundColor = 'transparent'
         searchInput.style.left = '0px'
-        searchInput.style.margin = 'auto 0px';
-        searchInput.style.margin = '0px'
-        searchInput.style.marginLeft = '65px'
         searchInput.style.margin = '0px';
         searchInput.style.outline = 'none';
         searchInput.style.left = '0px';
         searchInput.style.border = 'var(--stdBorder)';
-        searchInput.style.width = '315px'
+        searchInput.style.width = '400px'
         searchInput.style.textAlign = 'left';
         searchInput.style.fontSize = '17px';
         searchInput.placeholder = 'Search:';
-
+        
         channelInfoHolder.appendChild(searchInput);
 
+        // add event listener to search input
+        searchInput.addEventListener('input', function(event) {
+            console.log('Input value changed:', event.target.value);
+            const CTH = document.getElementById('channelThreadsHolder');
+            for (let thh of CTH.children) {
+                if (thh.className == 'threadHeaderHolder') {
+                    // https://tomekdev.medium.com/highlight-matching-text-in-javascript-ff803c9af7b0
+                    let title = thh.querySelector('.threadHeaderTitle').textContent.toLowerCase();
+                    const desc = thh.querySelector('.stdMinorText').textContent.toLowerCase();
+                    const searchValue = event.target.value.toLowerCase();
+                    if (title.includes(searchValue) || desc.includes(searchValue)) {
+                        thh.style.display = 'block'; // Show the thread
+                    } else {
+                        thh.style.display = 'none'; // Hide the thread
+                    }
+
+                    title = thh.querySelector('.threadHeaderTitle');
+                    console.log('title: ', title.textContent);
+                    const searchText = event.target.value;
+                    const regex = new RegExp(searchText, 'gi');
+                  
+                    let text = title.textContent;
+                    text = text.replace(/(<mark class="highlight">|<\/mark>)/gim, '');
+                  
+                    const newText = text.replace(regex, '<mark class="highlight">$&</mark>');
+                    title.innerHTML = newText;
+                }
+            }
+            
+        });
 
         // add the search magnifying class icon
         const searchIcon = document.createElement('img');
-        searchIcon = 'icons/256px-Magnifying_glass_icon.svg'
+        searchIcon.src = '/icons/256px-Magnifying_glass_icon.svg'
         searchIcon.width = '20';
         searchIcon.height = '20';
-
-        searchInput.appendChild(searchIcon);
+        searchIcon.style.position = 'absolute';
+        searchIcon.style.right = '5px'
+        searchIcon.style.top = '50%';
+        searchIcon.style.transform = 'translateY(-50%)';
+        channelInfoHolder.appendChild(searchIcon);
     }
 }
 
@@ -249,9 +347,14 @@ async function loadThreads(threads) {
         thh.dataset.threadID = thread.id;
         thh.addEventListener('click', setCurrentThreadFromThreadHandleButton);
 
+        threadsHolder.appendChild(thh);
+
         const title = document.createElement("p");
+        title.style.position = 'absolute'
+        title.style.padding = '5px';
+        title.style.paddingTop = '1px';
         title.className = "threadHeaderTitle";
-        title.textContent = thread.name; // assuming thread.name is defined
+        title.textContent = thread.name;
 
         thh.appendChild(title); // add <p> to the <div>
         
@@ -261,25 +364,66 @@ async function loadThreads(threads) {
         desc.style.textShadow = 'var(--stdMinorShadow)'
         desc.style.color = 'var(--mainTextColor)'
         desc.style.padding = '0px';
-        desc.style.paddingLeft = '5px';
-        desc.style.margin = '5px';
-        desc.textContent = thread.description; // assuming thread.name is defined
+        desc.style.margin = '0px';
+        desc.textContent = thread.description;
+        desc.style.position = 'absolute';
+        desc.style.left = '10px';
+        desc.style.marginTop = '33px';
         thh.appendChild(desc); // add <p> to the <div>
-
-        threadsHolder.appendChild(thh);
-
         
+        {
+            if (window.user == undefined || thread.ownerUsername == window.user.username) {
+                const deleteThreadButton = document.createElement('button');
+                deleteThreadButton.id = 'deleteThreadButton';
+                deleteThreadButton.style.position = 'absolute';
+                deleteThreadButton.className = 'deleteThreadButton';
+                deleteThreadButton.style.backgroundColor = 'var(--navBarColor)';
+                deleteThreadButton.style.margin = '5px';
+                deleteThreadButton.style.marginLeft =  `${title.clientWidth + title.offsetLeft + 5}px`;
+                deleteThreadButton.dataset.threadID = thread.id;
+                deleteThreadButton.dataset.channelID = window.currentChannel.id;
+                deleteThreadButton.style.zIndex = 500;
+
+                const deleteIcon = document.createElement('img');
+                deleteIcon.width = 20;
+                deleteIcon.height = 20;
+                deleteIcon.src = '\\icons\\delete-icon.png';
+                
+                deleteThreadButton.appendChild(deleteIcon);
+
+                thh.appendChild(deleteThreadButton);
+                
+                deleteThreadButton.addEventListener('click', (event) => {
+                    
+                    const channel_id = deleteThreadButton.dataset.channelID;
+                    const thread_id = deleteThreadButton.dataset.threadID;
+                    askServerToDeleteThread(channel_id, thread_id);
+                    window.threads = window.threads.filter(item => (thread_id == item.threadID));
+                    
+                    for (let thh of threadsHolder.children) {
+                        if (thh.dataset.threadID == thread_id) {
+                            thh.remove();
+                        }
+                    }
+                    event.stopPropagation(); // prevent fallthrough to the button below
+                });
+            }
+        }
+
         // additional info div
         const additionalInfoDiv = document.createElement('div');
-        additionalInfoDiv.style.display = 'flex';
+        additionalInfoDiv.style.position = 'relative';
         additionalInfoDiv.style.border = 'var(--stdBorder)'
-        additionalInfoDiv.style.position = 'absolute';
-        additionalInfoDiv.style.top = '4px';        
-        additionalInfoDiv.style.right = '4px';
         additionalInfoDiv.style.width = '400px';
-        additionalInfoDiv.style.height =  `${thh.clientHeight-8}px`
+        additionalInfoDiv.style.height =  `50px`
+        additionalInfoDiv.style.padding = '0px';
+        additionalInfoDiv.style.marginLeft = 'auto'; 
+        additionalInfoDiv.style.marginRight = '2px';
+        
+        additionalInfoDiv.style.marginTop = '2px'
+        additionalInfoDiv.style.marginBottom = 'auto'
         additionalInfoDiv.style.boxShadow = 'var(--stdMinorShadow)'
-
+        thh.append(additionalInfoDiv);
 
         // message count
         const msgCountP = document.createElement('p');
@@ -295,7 +439,12 @@ async function loadThreads(threads) {
         // last active time
         const lastActiveP = document.createElement('p');
         lastActiveP.className = 'stdText';
-        lastActiveP.innerText = `Last Active: ${'placeholder'}`;
+        if (thread.lastActive == undefined) {
+            lastActiveP.innerText = `No recorded activity`;
+        } else {
+            lastActiveP.innerText = `Last Active: ${getRelativeTimeStr(thread.lastActive)}`;
+
+        }
         lastActiveP.style.position = 'absolute';
         lastActiveP.style.left = '0px'; 
         lastActiveP.style.padding = '0';
@@ -311,19 +460,27 @@ async function loadThreads(threads) {
             pfpImgSrc = `\\profile-pictures\\${thread.ownerUsername }.jpg`
         }
 
+        const pfpImgHREFwrapper = document.createElement('a');
+        pfpImgHREFwrapper.href = `/users/${thread.ownerUsername}`
+        pfpImgHREFwrapper.style.width = '40px';
+        pfpImgHREFwrapper.style.height = '40px';
+        pfpImgHREFwrapper.style.padding = '0';
+        pfpImgHREFwrapper.style.margin = 'auto 0px'
+        pfpImgHREFwrapper.style.boxShadow = 'var(--stdMinorShadow)'
+        pfpImgHREFwrapper.style.position = 'absolute';
+        pfpImgHREFwrapper.style.right = '5px'
+        pfpImgHREFwrapper.style.top = '50%'; // Position it at the vertical center
+        pfpImgHREFwrapper.style.transform = 'translateY(-50%)'; // Adjust the vertical positioning to truly center it
+        additionalInfoDiv.append(pfpImgHREFwrapper);
+
         // owner username & pfp
         const pfpIMG = document.createElement('img');
         pfpIMG.width = '40';
         pfpIMG.height = '40';
         pfpIMG.src = pfpImgSrc;
-        pfpIMG.style.padding = '0';
-        pfpIMG.style.margin = 'auto 0px'
-        pfpIMG.style.boxShadow = 'var(--stdMinorShadow)'
-        pfpIMG.style.position = 'absolute';
-        pfpIMG.style.right = '5px'
-        pfpIMG.style.top = '50%'; // Position it at the vertical center
-        pfpIMG.style.transform = 'translateY(-50%)'; // Adjust the vertical positioning to truly center it
-        additionalInfoDiv.append(pfpIMG);
+
+        
+        pfpImgHREFwrapper.appendChild(pfpIMG);
 
         const ownerName = document.createElement('p');
         ownerName.className = 'stdText';
@@ -334,7 +491,5 @@ async function loadThreads(threads) {
         ownerName.style.margin = 'auto 5px'; 
         
         additionalInfoDiv.append(ownerName);
-
-        thh.append(additionalInfoDiv);
     }
 }

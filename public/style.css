@@ -63,22 +63,38 @@ body {
     padding: 0px;
 }
 
-.navbarUL li a {
-    font-size: 22px;
+
+.navbarUL li {
     display: block;
-    color: var(--mainTextColor);
-    text-decoration: none;
-    font-family: var(--stdHeaderFontFamily);
-    font-weight: 900;
-    text-shadow:  var(--stdShadow);
     padding: 10px 17px;
-    transition: transform 0.19s ease; 
 }
 
-.navbarUL li a:hover {
-    background-color: rgb(105, 123, 106);
+.navbarUL li a {
+    font-size: 22px;
+    font-family: var(--stdHeaderFontFamily);    
+    font-weight: 900;
+    text-shadow:  var(--stdShadow);
+    color: var(--mainTextColor);
+    text-decoration: none;
+}
+
+.navbarUL li img {
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
+}
+
+.navbarUL li:hover {
+    background-color: color-mix(in srgb, var(--navBarColor) 90%, black);
+    /*
     transform: scale(1.1);
     filter: blur(0);
+    */
+    padding-top: 11px;
+    padding-bottom: 9px;
+    padding-left: 17px;
+    padding-right: 16px;
+
+    box-shadow: var(--stdInsetMinorShadow);
 }
 
 /*--------------------------------------------*/
@@ -178,6 +194,15 @@ div.channelNameHeader {
     border : 1px solid black;
     margin: 0px;
     padding: 0px;
+    position: 'relative';
+    height: 55px;
+    min-width: 500px
+}
+
+.stagingThread {
+    border : 1px solid black;
+    margin: 0px;
+    padding: 0px;
 }
 
 .threadHeaderTitle {
@@ -194,7 +219,6 @@ div.channelNameHeader {
 /*MESSAGES*/
 .threadMessagesHolder {
     position: relative; /* Parent positioning context */
-    overflow-y: auto;
     position: absolute ;
     top: 84px;
     left: var(--channelBarWidth);
@@ -213,6 +237,8 @@ div.channelNameHeader {
     scrollbar-width: thin;
     list-style: none;
     margin: 0;
+    margin-top: 5px;
+
     margin-left: 10px;
     padding: 0px;
     width: calc(100% - 0px);
@@ -238,20 +264,20 @@ div.channelNameHeader {
 
 .msg-text {
     position: relative;
-    margin-top: 15px;   /* 10px from the top of the parent */
-    left: 5px;  /* 20px from the left of the parent */
-    font-size: 26px;
+    margin-top: 15px;   
+    left: 5px;  
+    font-size: 18px;
     display: block;     /* block makes it easier to wrap properly */
-    white-space: normal; /* ensures wrapping */
+    white-space: pre-wrap; 
     word-wrap: break-word; /* break long words if needed */
-    max-width: calc(100% - 100px); /* prevents it from overflowing */
+    max-width: calc(100% - 100px);
     
 }
 
 .msg-username {
     position: absolute;
-    top: 5px;   /* 10px from the top of the parent */
-    left: 55px;  /* 20px from the left of the parent */
+    top: 5px; 
+    left: 45px;  
     font-size: 10px;
     display: inline-block;
 }
@@ -269,8 +295,8 @@ div.channelNameHeader {
 }
 
 .threadMessagesProfileDiv {
-    width: 45px;
-    height: 45px;
+    width: 35px;
+    height: 35px;
     border: var(--stdBorder);
 }
 
@@ -283,7 +309,9 @@ div.channelNameHeader {
 /*CHAT BOX*/
 div.chatTypeDiv {
     position: fixed;
-    height: var(--chatTypeBoxHeight);
+    min-height: var(--chatTypeBoxHeight);
+    height: auto;
+    overflow: hidden;
     left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth) - 30px - 300px ); /* - 60px -> should be margin x 2*/ 
     background-color: var(--navBarColor);
@@ -298,7 +326,6 @@ div.chatTypeDiv {
     flex: 1;
     border: var(--stdBorder);
     background-color: transparent;
-    height: 100%;
     font-size: 15px; /* optional, to style input text */
     font-family: var(--stdMinorFontFamily);
     color: var(--mainTextColor);
@@ -333,6 +360,41 @@ div.chatTypeDiv {
     background-color: color-mix(in srgb, var(--navBarColor) 80%, white);
 }
 
+.message-right-click-box {
+    position: fixed; /*relative to scren space*/
+    background-color: var(--navBarColor);
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
+    padding: 0px;
+    margin: 0px;
+    z-index: 1000; /* Ensure it appears above other elements */
+    display: none;
+}
+
+.message-right-click-button {
+    border: var(--stdBorder);
+    padding: 0px;
+    margin: 0px;
+    height: 21px;
+}
+
+.message-right-click-button:hover {
+    background-color: color-mix(in srgb, var(--navBarColor) 90%, black);
+}
+
+.message-right-click-box p {
+    cursor: default;
+    margin: 1px;
+    text-align: center;
+    padding-top:0;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-family: var(--stdMinorFontFamily);
+    font-weight: 400;
+    font-size: 15px;
+}
+
 /*--------------------------------------------*/
 /*USER ACCOUNT MANAGEMENT*/
 .userLoginButton {
@@ -347,6 +409,12 @@ div.chatTypeDiv {
 
 }
 
+#pfp-img{
+    border: var(--stdBorder);
+    box-shadow: var(--stdShadow);
+    margin: 10px;
+    padding: 0px;
+}
 #pfp-img:hover {
     filter: brightness(0.5) saturate(1.5);
 }
@@ -354,7 +422,7 @@ div.chatTypeDiv {
 /*--------------------------------------------*/
 /*GENERAL*/
 
-.stdText{
+.stdText {
     margin: 1px;
     text-align: center;
     padding-top:0;
@@ -363,4 +431,28 @@ div.chatTypeDiv {
     text-decoration: none;
     font-family: var(--stdMinorFontFamily);
     font-weight: 400;
+}
+
+.input-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    margin: 4px 0 8px 0;
+    font-size: 14px;
+    font-family: var(--stdMinorFontFamily);
+    height: 60px;
+}
+
+.errorText {
+    bottom: 4px;
+    color: rgb(224, 26, 26);
+    position: relative;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--stdMinorFontFamily);
+    text-decoration: none;
+    text-align: center;
+    text-shadow: var(--stdMinorShadow);
 }

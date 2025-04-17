@@ -17,6 +17,7 @@ async function initDB(dbPool) {
             password VARCHAR(128) NOT NULL,
             description VARCHAR(256) NOT NULL DEFAULT "",
             hasProfilePicture INT NOT NULL DEFAULT 0,
+            isAdmin INT NOT NULL DEFAULT 0,
             registerDate DATETIME NOT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
@@ -82,20 +83,32 @@ async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearU
     if (channels !== undefined) {
         for (let channel of channels) {
             if (clearThreads) {
-                // delete messages for all threads in that channel
-                const threads = await getThreadsFromChannel(dbPool,channel.id);
+                try {
+                    // delete messages for all threads in that channel
+                    const threads = await getThreadsFromChannel(dbPool,channel.id);
 
-                for (let thread of threads) {
-                    const threadMessageTableName = getMessageTableNameFromThread(thread.id, channel.id);
-                    const deleteMsgTableQuery = `DROP TABLE IF EXISTS ${threadMessageTableName}`;
-                    await dbPool.query(deleteMsgTableQuery);
+                    for (let thread of threads) {
+                        const threadMessageTableName = getMessageTableNameFromThread(channel.id, thread.id);
+                        const deleteMsgTableQuery = `DROP TABLE IF EXISTS ${threadMessageTableName}`;
+                        await dbPool.query(deleteMsgTableQuery);
+                    }
+                
+                
+                    // delete channel thread table
+                    const threadTableName = getThreadTableNameFromChannelID(channel.id);
+                    
+                    try {
+                    const resetAutoIncQuery = `ALTER TABLE ${threadTableName} AUTO_INCREMENT = 1`
+                    await dbPool.query(resetAutoIncQuery)
+                    } catch (err) {}
+
+                    const deleteThreadTableQuery = `DROP TABLE IF EXISTS ${threadTableName}`;
+                    await dbPool.query(deleteThreadTableQuery);
+                } catch (err) {
+
                 }
-            
-                // delete channel thread table
-                const threadTableName = getThreadTableNameFromChannelID(channel.id);
-                const deleteThreadTableQuery = `DROP TABLE IF EXISTS ${threadTableName}`;
-                await dbPool.query(deleteThreadTableQuery);
             }
+            
         }
     }
 
@@ -170,13 +183,13 @@ async function createThreadTableForChannel(dbPool, channelID) {
 async function createMessageTableForThread(dbPool, channelID, threadID) {
     if (dbPool === undefined) { throw new Error('dbPool is required as an argument'); }
 
-    const tableName = getMessageTableNameFromThread(channelID, threadID);
+    const msgTable = getMessageTableNameFromThread(channelID, threadID);
 
     // message table
-    const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (
+    const createTableQuery = `CREATE TABLE IF NOT EXISTS ${msgTable} (
         id INT AUTO_INCREMENT PRIMARY KEY,
         ownerID INT,
-        content VARCHAR(1024),
+        content VARCHAR(4096),
         date DATETIME
     )
     `
@@ -184,7 +197,7 @@ async function createMessageTableForThread(dbPool, channelID, threadID) {
     await dbPool.query(createTableQuery);
 }
 
-function getMessageTableNameFromThread(threadID, channelID) {
+function getMessageTableNameFromThread(channelID, threadID) {
     return process.env.MYSQL_MESSAGE_TABLE + String(threadID) + "__" + String(channelID);
 }
 
@@ -196,6 +209,10 @@ async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescr
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
     }
+    if (threadOwnerID == undefined || threadName == undefined || threadDescription == undefined || channelID == undefined) {
+        throw new Error('threadOwnerID, threadName, threadDescription and channelID are required as arguments');
+    }
+
     const tableName = getThreadTableNameFromChannelID(channelID);(channelID);
     const addThreadQuery = `INSERT INTO ${tableName} (ownerID, name, description, creationDate) VALUES (?, ?, ?, ?)`;
 
@@ -336,7 +353,14 @@ async function registerUser(dbPool, email, username, plainPassword, description 
     if (username == null || email == null || plainPassword == null) {
         return new Error("Enter valid data"); // invalid data passed into function
     }
-    if(validateEmail(email)){ 
+    if (username.length <= process.env.USERNAME_MIN_LENGTH) {
+        return new Error(`Username must be at least ${process.env.USERNAME_MIN_LENGTH} characters long`);
+    }
+    if (plainPassword.length <= process.env.PASSWORD_MIN_LENGTH) {
+        return new Error(`Password must be at least ${process.env.PASSWORD_MIN_LENGTH} characters long`);
+    }
+    const hasValidEmail =validateEmail(email);
+    if(hasValidEmail == false){ 
         return new Error("Invalid Email")
     }
     const tmp = await getUserIDfromUsername(dbPool, username);
@@ -365,23 +389,86 @@ async function registerUser(dbPool, email, username, plainPassword, description 
     return undefined;
 }
 
-async function getThreadsFromChannel(dbPool, channelID) {
-    if (dbPool === undefined) {
-        throw new Error('dbPool is required as an argument');
-    }
-   
-    const getQuery = `SELECT * FROM ${getThreadTableNameFromChannelID(channelID)};`
-    const [rows] = await dbPool.query(getQuery);
-    for (let row of rows) {
-        if (row.ownerID) {
-            const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
-            row.ownerUsername = publicUser.username;
-            row.ownerHasProfilePicture = publicUser.hasProfilePicture;
-        } else {
-            row.ownerUsername = 'error: undefined'
+async function getThreadLastActiveDate(dbPool, channelID, threadID) {
+    try {
+        if (dbPool === undefined) {
+            throw new Error('dbPool is required as an argument');
         }
+        
+        const getMostRecentMessageQuery = `SELECT * FROM ${getMessageTableNameFromThread(channelID,threadID)} ORDER BY id DESC LIMIT 1;`
+
+        const [row] = await dbPool.query(getMostRecentMessageQuery)
+        if (row == undefined || row.length == 0 ) {return undefined;};
+        return row[0];
+    } catch (err) {
+        console.error('Failed to get last active date: ', err);
+        return false;
     }
-    return rows;
+}
+
+async function getThreadsFromChannel(dbPool, channelID) {
+    try {
+        if (dbPool === undefined) {
+            throw new Error('dbPool is required as an argument');
+        }
+    
+        const getQuery = `SELECT * FROM ${getThreadTableNameFromChannelID(channelID)};`
+        let [rows] = await dbPool.query(getQuery);
+        for (let row of rows) {
+            if (row.ownerID) {
+                const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
+                if (publicUser == undefined) {
+                    console.error (`Cannot retrieve thread ${row.id}, as the ownerID of the thread is invalid`);
+                    continue;
+                }
+                row.ownerUsername = publicUser.username;
+                row.ownerHasProfilePicture = publicUser.hasProfilePicture;
+                const lastMSG = await getThreadLastActiveDate(dbPool, channelID, row.id);
+                if (lastMSG) {
+                    row.lastActive = lastMSG.date;
+                }
+            } else {
+                row.ownerUsername = 'error: undefined'
+            }
+        }
+        if (rows == undefined || rows.length == 0) {
+            rows = [];
+        }
+        return rows;
+    } catch (err) {
+        console.error("Failed to get threads from channel: ", err);
+        return undefined;
+    }
+}
+
+async function getThreadFromID(dbPool, channelID, threadID) {
+    try {
+        const query = `SELECT * FROM ${getThreadTableNameFromChannelID(channelID)} WHERE id = ?;`;
+        const [rows] = await dbPool.query(query, [threadID]);
+        if (rows.length == 0) {
+            return undefined; // thread does not exist
+        }
+        return rows[0];
+    } catch (err) {
+        console.error("Failed to get thread from ID: ", err);
+        return false;
+    }
+}
+
+async function deleteThread(dbPool, channelID, threadID) {
+    try {
+        if (threadID == undefined || channelID == undefined) {
+            throw new Error("ThreadID and channelID are required as arguments")
+        }
+        threadID = Number(threadID);
+        const threadTableName = getThreadTableNameFromChannelID(channelID);
+
+        const deleteThreadQuery = `DELETE FROM ${threadTableName} WHERE id = ?`;
+        await dbPool.query(deleteThreadQuery, [threadID]);
+    } catch (err) {
+        console.error("Failed to delete thread: ", err);
+        return false;
+    }
 }
 
 async function getDescriptionFromChannel(dbPool, channelID) {
@@ -461,7 +548,7 @@ async function getMessagesFromThread(dbPool, channelID, threadID) {
         if (threadID === undefined) { throw new Error('threadID is required as an argument')}
 
         
-        const messageTableName = getMessageTableNameFromThread(threadID,channelID);
+        const messageTableName = getMessageTableNameFromThread(channelID,threadID);
         const query = `SELECT * FROM ${messageTableName};`;
 
         const [rows] = await dbPool.query(query);
@@ -480,6 +567,49 @@ async function getMessagesFromThread(dbPool, channelID, threadID) {
     }
 }
 
+// note that chunkIndex starts from the bottom (most recent messages first)
+// will return a null array if the index is out of bounds
+async function getMessageChunkFromThread(dbPool, channelID, threadID, chunkIndex) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+        if (chunkIndex === undefined) { throw new Error('chunkIndex is required as an argument')}
+
+        const chunkSize = Number(process.env.MESSAGE_CHUNK_SIZE);
+        const messageTableName = getMessageTableNameFromThread(channelID, threadID);
+
+        const offset = chunkIndex * chunkSize;
+
+        const [countResult] = await dbPool.query(`SELECT COUNT(*) AS count FROM ${messageTableName}`);
+        const totalMessages = countResult[0].count;
+
+        // Out of bounds check
+        if (offset >= totalMessages) {
+            return [];
+        }
+
+        const query = `
+            SELECT * FROM ${messageTableName} ORDER BY id DESC LIMIT ? OFFSET ?;
+        `;
+
+        const [rows] = await dbPool.query(query, [chunkSize, offset]);
+
+        for (let row of rows) {
+            const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
+            row.ownerUsername = publicUser.username;
+            row.ownerHasProfilePicture = publicUser.hasProfilePicture;
+            const date = new Date(row.date);
+            row.date = date.toISOString();
+        }
+        return rows;
+        
+    } catch (err) {
+        console.error("Failed to get message chunk from thread: ", err);
+        return undefined;
+    }
+}
+
 async function addMessageToThread(dbPool, channelID, threadID, userID, messageContent) {
     try {
         if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
@@ -488,7 +618,7 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
         if (userID === undefined) { throw new Error('userID is required as an argument')}
         if (messageContent === undefined) { throw new Error('messageContent is required as an argument')}
 
-        const threadMessageTableName = getMessageTableNameFromThread(threadID, channelID);
+        const threadMessageTableName = getMessageTableNameFromThread(channelID,threadID);
         const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, date) VALUES (?, ?, ?)`
 
         const now = new Date();
@@ -503,6 +633,37 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
     }
 }
 
+async function deleteMessageFromThread(dbPool, channelID, threadID, messageID, ownerID) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+        if (messageID === undefined) { throw new Error('messageID is required as an argument')}
+        if (ownerID === undefined) { throw new Error('ownerID is required as an argument')}
+
+        if (Number(channelID) == NaN) {return false;};
+        if (Number(threadID) == NaN) {return false;};
+        if (Number(messageID) == NaN) {return false;};
+        if (Number(ownerID) == NaN) {return false;};
+
+
+        const messageTable = getMessageTableNameFromThread(channelID, threadID);
+        // first check to make sure that the user owns this message
+        const getMessageAtIDquery = `SELECT * FROM ${messageTable} WHERE ownerID = ? AND id = ?`;
+        const [rows] =  await dbPool.query(getMessageAtIDquery, [ownerID, messageID]);
+        if (rows == undefined || rows.length > 1 || rows.length == 0) {
+            throw new Error("Failed to delete message!");
+        }
+        // the user owns the message, proceed with deletion
+        if (rows[0].ownerID == ownerID) { 
+            const query = `DELETE FROM ${messageTable} WHERE id = ?`;
+            await dbPool.query(query, [messageID]);
+        }
+    } catch (err) {
+        console.log("Failed to delete message from thread: ", err);
+        return false;
+    }
+}
 
 async function getMessageCountOfThread (dbPool, channelID, threadID) {
     try {
@@ -511,7 +672,7 @@ async function getMessageCountOfThread (dbPool, channelID, threadID) {
         if (threadID === undefined) { throw new Error('threadID is required as an argument')}
 
         
-        const messageTableName = getMessageTableNameFromThread(threadID,channelID);
+        const messageTableName = getMessageTableNameFromThread(channelID,threadID);
         const query = `SELECT COUNT(*) FROM ${messageTableName};`;
 
         const [rows] = await dbPool.query(query);
@@ -539,8 +700,9 @@ async function giveUserProfilePicture(dbPool, userID) {
 export default {
     initDB, clearDB, initChannels, getChannelCount, registerUser, 
     isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
-    createChannel, getChannels, addThreadToChannel, getThreadsFromChannel,
-    getDescriptionFromChannel, getPublicUserInfo, updateUserName, updateUserDescription,
-    getMessagesFromThread, addMessageToThread, getMessageCountOfThread,
-    giveUserProfilePicture     
+    createChannel, getChannels, addThreadToChannel, getThreadsFromChannel, 
+    getThreadFromID, deleteThread, getDescriptionFromChannel, getPublicUserInfo,
+    updateUserName, updateUserDescription, getMessagesFromThread, 
+    getMessageChunkFromThread, addMessageToThread, deleteMessageFromThread, 
+    getMessageCountOfThread, giveUserProfilePicture
 };

@@ -24,7 +24,6 @@ const dbOptions = {
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
-    timezone: 'utc'
 }
 
 const dbPool =  mysql.createPool(dbOptions).promise()
@@ -37,13 +36,17 @@ initialize(
     passport
 );
 
-await dbUtils.clearDB(dbPool);
+await dbUtils.clearDB(dbPool, false, true, false);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
 
 const channels = await dbUtils.getChannels(dbPool);
-dbUtils.addThreadToChannel(dbPool, 1, "Test Thread", "A thead for testing purposes", channels[0].id)
+await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread", "A thead for testing purposes", channels[1].id)
+
+ for (let i = 0; i <= 64*20; i++) {
+      await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `${i} THIS IS A MESSAGE!!!!`)
+ }
 
 import router from '../Routers/router.js'
 await router.init(app,dbOptions,dbPool, passport, io);
@@ -51,8 +54,6 @@ import dbAPI from '../Routers/databaseAPI.js'
 await dbAPI.init(app,dbPool)
 
 dbUtils.getChannels(dbPool);
-
-await dbUtils.registerUser(dbPool, 'w@w', 'w', "w", "my description! A max of 256 characters");
 
 // Start the server
 server.listen(PORT, () => {

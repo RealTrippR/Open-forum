@@ -129,7 +129,21 @@ async function init(app, _dbPool) {
         }
     });
 
+    // get message chunk
+    app.post('/api-get-message-chunk-from-thread', async(req,res) => {
+        try {
+            const body = req.body;
+            
+            const messages = await dbUtils.getMessageChunkFromThread(dbPool, body.channelID, body.threadID, body.chunkIndex);
+            res.status(200).json({messages: messages}).send();
+        } catch (err) {
+            console.error("Failed to get thread messages: ", err);
+            res.status(500).send();
+        }
+        return;
+    });
 
+    // get all messages
     app.post('/api-get-messages-from-thread', async(req,res) => {
         try {
             const body = req.body;
@@ -157,6 +171,40 @@ async function init(app, _dbPool) {
             res.status(500).send();
         }
         return;
+    });
+
+    app.post('/api-delete-thread', async(req,res) => {
+        try {
+            if (req.isAuthenticated() == false) {
+                return res.status(401).send();
+            }
+            const body = req.body;
+            if (body.threadID == undefined) {
+                return res.status(400).send();
+            }
+
+            ( async () => {
+                try {
+                    const th = await dbUtils.getThreadFromID(dbPool, body.channelID, body.threadID);
+                    if (th==undefined) {
+                        return res.status(500).send();
+                    }
+                    
+                    const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
+                    const userID = user.id;
+                    if (th.ownerID != userID) {
+                        return res.status(401).send();
+                    }
+                    await dbUtils.deleteThread(dbPool, body.channelID, body.threadID);
+                } catch (err) { console.error("Failed to delete thread: ", err);}
+            })();
+            
+            return res.status(200).send();
+
+        } catch (err) {
+            console.error("Failed to delete thread: ", err);
+            return res.status(500).send();
+        }
     });
 
     app.post('/api-update-pfp', async(req,res) => {

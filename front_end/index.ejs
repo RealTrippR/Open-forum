@@ -13,8 +13,8 @@
 <div id="channelThreadsHolder" class="channelThreadsHolder"> </div> <!-- thread header buttons are stored here -->
 <div id="threadMessagesHolder" class="threadMessagesHolder" style="display: none;"> </div> <!-- holds the messages for the current thread-->
 <div id="channelInfoBarHolder" class="channelInfoBarHolder" style="display: none;"> </div>
-
 <div id="channelNameHeader" class="channelNameHeader"> </div>
+<div id="copyright-div"> </div>
 <!-- init socket.io -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -25,11 +25,24 @@
 <script src="/loadThread.js"> </script>
 <script src="/loadChannelBar.js"> </script>
 <script src="/loadChannel.js" ></script>
+<script src="/loadCopyright.js"></script>
 
 <script>
-    window.onload = function() {
+
+    function loadPage() {
+        
         window.user = <%- user %>
         window.loggedIn = <%- loggedIn %>
+
+        let _loadChannel = undefined;
+        <% if (locals.loadChannel) { %>
+            _loadChannel = <%- loadChannel %> - 1;
+        <% } %>
+        let _loadThread = undefined;
+        <% if (locals.loadThread) { %>
+            _loadThread = <%- loadThread %>;
+        <% } %>
+        
         loadNavbar();
         // it's weird, but it works - don't touch it!
         let _channels = <%- JSON.stringify(channels) %>
@@ -40,9 +53,47 @@
         loadChannelBar();
         createStagingThreadAndThreadInfoHolder()
         initMessageHolder();
-        setCurrentChannel(window.channels[0]);
-        console.log("Page has fully loaded");
-        // Your code to execute after the page is loaded
+
+
+        if (_loadChannel != undefined) {
+            let loadHTML = true;
+            if (_loadThread) {
+                loadHTML = false;
+            }
+            (async () => {
+
+                await setCurrentChannel(window.channels[_loadChannel], loadHTML);
+
+                if (_loadThread != undefined) {
+                    setCurrentThread(_loadThread);
+                }
+            })();
+
+        } else if (_loadThread == undefined) {
+            setCurrentChannel(window.channels[0]);
+        }
+    }
+    // 
+    window.onload = function() {
+        loadPage();
+        loadCopyright(true);
     };
+
+    window.addEventListener('popstate', (event) => {
+    const state = event.state;
+    if (state && state.channelId) {
+        state.channelId = state.channelId - 1;
+        if (state.threadId) {
+            setCurrentChannel(window.channels[state.channelId], false);
+            setCurrentThread(state.threadId);
+        } else {
+            setCurrentChannel(window.channels[state.channelId]);
+        }
+    } else {
+        // fallback if no state is present
+        setCurrentChannel(window.channels[0]);
+    }
+
+});
 </script>
 </body>

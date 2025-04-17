@@ -18,7 +18,7 @@ async function getThreadsFromServer(channelID) {
     return channel.threads;
 }
 
-function setCurrentChannel(channel) {
+async function setCurrentChannel(channel, loadHTML = true) {
 
     let channelBarHandleButtons = document.getElementsByClassName("channelBarHandleButton");
     if (window.currentChannel != null) {
@@ -33,6 +33,12 @@ function setCurrentChannel(channel) {
 
     window.currentChannel = channel;
 
+    let state = {channelId: window.currentChannel.id}; if (window.threadID !=undefined) {state.threadID = window.threadID};
+    window.history.pushState(state, '', `/channels/${channel.id}`);
+
+    window.currentChannel.threads = await getThreadsFromServer(window.currentChannel.id);
+
+    
     for (let channelHandle of channelBarHandleButtons) {
         if (window.currentChannel.name == channelHandle.dataset.channelName) {
             channelHandle.style.boxShadow = 'var(--stdInsetMinorShadow)'; // Be sure to remove any ;
@@ -40,6 +46,7 @@ function setCurrentChannel(channel) {
             break;
         } 
     }
+
     {
         // initialize the name bar
         let channelNameHeader = document.getElementById('channelNameHeader');
@@ -51,20 +58,20 @@ function setCurrentChannel(channel) {
         channelNameHeader.innerHTML = HTML;
         
     }
+    
+    if (loadHTML) {
 
-    (async () => {
-        window.currentChannel.threads = await getThreadsFromServer(window.currentChannel.id);
-        loadThreads(window.currentChannel.threads);
-    })();
+        await loadThreads(window.currentChannel.threads);
 
-    const msgChatBox = document.getElementById('chatTypeDiv')
-    // hide message chat box
-    msgChatBox.style.display = 'none';
+        const msgChatBox = document.getElementById('chatTypeDiv')
+        // hide message chat box
+        msgChatBox.style.display = 'none';
 
 
-    // make the thread info holder visible
-    const channelInfoHolder = document.getElementById('channelInfoBarHolder');
-    channelInfoHolder.style.display = 'flex';
+        // make the thread info holder visible
+        const channelInfoHolder = document.getElementById('channelInfoBarHolder');
+        channelInfoHolder.style.display = 'flex';
+    }
 }
 
 function setCurrentChannelFromButton() {

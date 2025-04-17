@@ -19,6 +19,12 @@ let passport;
 let dbPool;
 let io;
 
+function isNumeric(str) {
+    if (typeof str != "string") return false // we only process strings!  
+    return !isNaN(str) && // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
+           !isNaN(parseFloat(str)) // ...and ensure strings of whitespace fail
+  }
+
 async function init(app,_dbOptions, _dbPool, _passport, _io) {
     dbOptions = _dbOptions;
     sessionStore = new MySQLStore(dbOptions);
@@ -151,6 +157,9 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
 
     app.post('/register', returnToHomepageIfAuthenticated, async (req,res) => {
         try {
+            if (req.body.username.length <= process.env.USERNAME_MIN_LENGTH ||  req.body.password.length <= process.env.PASSWORD_MIN_LENGTH) {
+                return req.status(400).send();
+            }
             const registerRES = await dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
             if (typeof(registerRES)==='string' || registerRES===undefined) { // register user will return a string if it fails
                 res.redirect('/login');
@@ -176,10 +185,10 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             const loggedIn = await req.isAuthenticated();
 
             if (req.isAuthenticated() && requestedUser.username==req.user.username) {
-                res.render('privateUserPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true), loggedIn: JSON.stringify(loggedIn)});
+                res.render('userPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true), loggedIn: JSON.stringify(loggedIn)});
                 return;
             }
-            res.render('publicUserPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false)});
+            res.render('userPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false), loggedIn: loggedIn});
         } catch (err) {
             console.error(err);
             res.status(500).send();
@@ -204,22 +213,50 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         }
     });
 
+    app.get('/channels/:channelId', async (req,res) => {
+        try {
+            const { channelId } = req.params;
+
+            if (isNumeric(channelId) == false) {
+                return;
+            } 
+
+            const channels = await dbUtils.getChannels(dbPool);
+
+            const authenticated = await req.isAuthenticated();
+
+            let currentUser = undefined;
+            if ( authenticated && req.user != undefined) {
+                currentUser = req.user;
+            }
+            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId})
+          
+        } catch (err) {
+            console.error("Failed to load channel page: ", err);
+            res.status(500).send();
+        }
+    });
+
     app.get('/channels/:channelId/:threadId', async (req, res) => {
         try {
-            const { channelId, threadId } = req.params;
-        
-            console.log("Channel ID:", channelId);
-            console.log("Thread ID:", threadId);
-            
-            //const messages = await dbUtils.getMessagesFromThread();
-            res.render('thread.ejs', {user: JSON.stringify(req.user), threadID: JSON.stringify(threadId)});
-            //res.status(200).send();
+            const { channelId, threadId} = req.params;
 
+            if ((isNumeric(channelId) && isNumeric(threadId)) == false) {
+                return res.send();
+            } 
+            const channels = await dbUtils.getChannels(dbPool);
+
+            const authenticated = await req.isAuthenticated();
+
+            let currentUser = undefined;
+            if ( authenticated && req.user != undefined) {
+                currentUser = req.user;
+            }
+            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId, loadThread: threadId})
+          
         } catch (err) {
-            const { channelId, threadId } = req.params;
-            console.error(`Failed to fetch thread #${channelId} of channel #${threadId}`, err);
+            console.error("Failed to load thread page: ", err);
             res.status(500).send();
-            return;
         }
     });
     
@@ -230,6 +267,9 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         console.log('A user connected');
         socket.on('send-message', async (req) => {
             try {
+                if (socket.request.user==undefined) {
+                    return; // user is not logged in
+                }
                 if (req.message.length == 0) {
                     return; // cannot send a blank message
                 }
@@ -249,6 +289,28 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
                 socket.emit('error', 'Failed to send message.');
             }
         })
+
+        socket.on('delete-message', async (req) => {
+            try {
+                if (socket.request.user==undefined) {
+                    return; // user is not logged in
+                }
+                if (req.messageID==undefined) {
+                    return; // invalid message
+                }
+                const privateUser = await dbUtils.getUserByUsername(dbPool, socket.request.user.username);
+                const reqUserID = privateUser.id;
+
+                await dbUtils.deleteMessageFromThread(dbPool, req.channelID, req.threadID, req.messageID, reqUserID);
+        
+                socket.broadcast.emit(`#${req.threadID}delete-chat-message`, {
+                    messageID: req.messageID,
+                });
+            } catch (err) {
+                console.error("Error deleting message:", err);
+                socket.emit('error', 'Failed to delete message.');
+            }
+        });
     });
 
 }

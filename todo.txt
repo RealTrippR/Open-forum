@@ -4,3 +4,4 @@
 [ ] Improve UI design?
 [ ] Implement thread and message searching
 [ ] Use JWT for sessions instead of a server side DB
+[ ] Optimize: Load messages in chunks

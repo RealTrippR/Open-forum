@@ -36,6 +36,11 @@ function initialize(_dbPool, passport) {
     passport.deserializeUser(async (id, done) => {
         try {
             const user = await dbUtils.getPublicUserInfo(dbPool, id);
+
+            if (!user) {
+                return done(null, false); // User not found, session won't be restored
+              }
+
             done(null, user);  // Store user object in req.user
         } catch (err) {
             done(err);
