@@ -97,18 +97,23 @@ async function init(app, _dbPool) {
             const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
             const userID = user.id;
 
-            await dbUtils.updateUserName(dbPool, newUsername, userID);
-
-            res.status(200).send();
+            const updateRes = await dbUtils.updateUserName(dbPool, newUsername, userID);
+            if (updateRes == 'err') {
+                return res.status(500).send();
+            }
+            if (updateRes == 'taken') {
+                return res.status(409).send(); // https://stackoverflow.com/questions/12657493/what-http-error-code-to-return-for-name-already-taken
+            }
+            return res.status(200).send();
         } catch (err) {
             console.error(err);
-            res.status(500).send();
+            return res.status(500).send();
         }
     });
 
     app.post('/api-update-user-description', async(req, res) => {
         if (!req.isAuthenticated()) {
-            return;
+            return req.status(401).send();
         }
         try {
             // description
@@ -129,11 +134,37 @@ async function init(app, _dbPool) {
         }
     });
 
+    app.post('/api-update-user-country-code', async(req, res) => {
+        if (!req.isAuthenticated()) {
+            return req.status(401).send();
+        }
+        try {
+            const  updateinfo  = req.body;
+            if (updateinfo == null) {
+                throw new Error("Thread info undefined!");
+            }
+            if (updateinfo.countryCode == undefined || updateinfo.countryCode.length != 2) {
+                res.status(400).send();
+            }
+            const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = user.id;
+
+            await dbUtils.updateUserCountryCode(dbPool, updateinfo.countryCode, userID);
+            res.status(200).send();
+        } catch(err) {
+            console.error("Failed to update country code of user: ", err);
+            res.status(500).send();
+        }
+    });
+
     // get message chunk
     app.post('/api-get-message-chunk-from-thread', async(req,res) => {
         try {
             const body = req.body;
             
+            if ( body.chunkIndex < 0 || body.channelID < 0 ||  body.threadID < 0) {
+                return res.status(400).send();
+            } 
             const messages = await dbUtils.getMessageChunkFromThread(dbPool, body.channelID, body.threadID, body.chunkIndex);
             res.status(200).json({messages: messages}).send();
         } catch (err) {

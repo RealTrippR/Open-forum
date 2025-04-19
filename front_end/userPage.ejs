@@ -12,17 +12,18 @@
 <script src="/loadNavbar.js"> </script>
 <script src="/loadUserPage.js"> </script>
 <script src="/loadNavbar.js"> </script>
+<script src="/countryCodes.js"> </script>
 <script src="/loadUserPage.js"> </script>
 <script src="/loadCopyright.js"></script>
 
 <script>
     window.isPrivatePage = Boolean(<%- JSON.stringify(isPrivatePage) %>)
-
+    console.log('priv',isPrivatePage);
     window.onload = function() {
         window.user = <%- user %>
         window.loggedIn = <%- loggedIn %>
         loadNavbar();
-        loadUserPage(JSON.stringify(isPrivatePage),window.user);
+        loadUserPage(window.user);
         loadCopyright();
     };
 

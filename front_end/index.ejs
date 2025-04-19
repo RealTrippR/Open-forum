@@ -31,8 +31,13 @@
 
     function loadPage() {
         
+        
         window.user = <%- user %>
         window.loggedIn = <%- loggedIn %>
+        window.messageChunkSize = <%- messageChunkSize %>
+
+        window.lowestChunkIndex = null;
+        window.highestChunkIndex = null;
 
         let _loadChannel = undefined;
         <% if (locals.loadChannel) { %>
@@ -41,6 +46,10 @@
         let _loadThread = undefined;
         <% if (locals.loadThread) { %>
             _loadThread = <%- loadThread %>;
+        <% } %>
+        let _loadMessage = undefined;
+        <% if (locals.loadMessage) { %>
+            _loadMessage = <%- loadMessage %>;
         <% } %>
         
         loadNavbar();
@@ -65,7 +74,13 @@
                 await setCurrentChannel(window.channels[_loadChannel], loadHTML);
 
                 if (_loadThread != undefined) {
-                    setCurrentThread(_loadThread);
+
+                    if (_loadMessage != undefined) {
+                        await setCurrentThread(_loadThread,true,false);
+                        await goToMessage(_loadMessage);
+                    } else {
+                        await setCurrentThread(_loadThread);
+                    }
                 }
             })();
 
@@ -93,7 +108,6 @@
         // fallback if no state is present
         setCurrentChannel(window.channels[0]);
     }
-
 });
 </script>
 </body>

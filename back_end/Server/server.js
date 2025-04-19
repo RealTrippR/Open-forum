@@ -24,6 +24,7 @@ const dbOptions = {
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
+    timezone: 'utc' /*ignore the console warning, this is nessecary to properly store datetimes*/
 }
 
 const dbPool =  mysql.createPool(dbOptions).promise()
@@ -36,20 +37,25 @@ initialize(
     passport
 );
 
-await dbUtils.clearDB(dbPool, false, true, false);
+//await dbUtils.clearDB(dbPool, false, true, false);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
-
 const channels = await dbUtils.getChannels(dbPool);
-await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread", "A thead for testing purposes", channels[1].id)
+// await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread", "A thead for testing purposes", channels[1].id)
 
- for (let i = 0; i <= 64*20; i++) {
-      await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `${i} THIS IS A MESSAGE!!!!`)
- }
+//  for (let i = 0; i < process.env.MESSAGE_CHUNK_SIZE*5; i++) {
+//       await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `${i+1}  -+- THIS IS A MESSAGE -+- `)
+//  }
+//  await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `M1`)
+//  await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `M2`)
+//  await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `M3`)
+
 
 import router from '../Routers/router.js'
 await router.init(app,dbOptions,dbPool, passport, io);
+import socket from '../Routers/socket.js'
+await socket.init(dbPool, io);
 import dbAPI from '../Routers/databaseAPI.js'
 await dbAPI.init(app,dbPool)
 

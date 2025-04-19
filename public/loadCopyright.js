@@ -7,7 +7,7 @@ that goes on the bottom on the page
 function loadCopyright(isIndexPage) {
     const copyrightDiv = document.getElementById("copyright-div");
     let HTML = '';
-    if (isIndexPage!=true) { HTML += `<HR style="color: var(--mainTextColor);">`;};
+    if (isIndexPage!=true) { HTML += `<HR style="border: var(--stdBorder);">`;};
     HTML += `<CENTER> <BR>
     <p class='stdText' style='font-size: 14px'> © 2025 Tripp Robins </p> 
 

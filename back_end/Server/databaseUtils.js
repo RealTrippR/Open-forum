@@ -2,6 +2,20 @@ import bcrypt, { hash } from 'bcrypt'
 import mysql from 'mysql2'
 import fs from 'fs'
 
+function roundTo(num, multiple, direction = 'nearest') {
+    if (multiple === 0) return num;
+
+    switch (direction) {
+        case 'up':
+            return Math.ceil(num / multiple) * multiple;
+        case 'down':
+            return Math.floor(num / multiple) * multiple;
+        case 'nearest':
+        default:
+            return Math.round(num / multiple) * multiple;
+    }
+}
+
 async function initDB(dbPool) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
@@ -18,7 +32,9 @@ async function initDB(dbPool) {
             description VARCHAR(256) NOT NULL DEFAULT "",
             hasProfilePicture INT NOT NULL DEFAULT 0,
             isAdmin INT NOT NULL DEFAULT 0,
-            registerDate DATETIME NOT NULL
+            registerDate DATETIME NOT NULL,
+            countryCode VARCHAR(2) DEFAULT NULL,
+            lastActive DATETIME DEFAULT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
         const CHANNELcreateTableQuery = `
@@ -190,6 +206,7 @@ async function createMessageTableForThread(dbPool, channelID, threadID) {
         id INT AUTO_INCREMENT PRIMARY KEY,
         ownerID INT,
         content VARCHAR(4096),
+        isReplyTo INT DEFAULT NULL,
         date DATETIME
     )
     `
@@ -222,7 +239,7 @@ async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescr
     const [result] = await dbPool.query(addThreadQuery, [threadOwnerID, threadName, threadDescription, datetime]);
     await createMessageTableForThread(dbPool, channelID, result.insertId);
     
-    console.log("Succesfully created thead ",threadName);
+    updateLastActive(dbPool, threadOwnerID);
 
     return result.insertId;
 }
@@ -288,6 +305,8 @@ async function getUserIDfromUsername(dbPool, username) {
         throw new Error('dbPool is required as an argument');
     }
     try {
+        username = username.toLowerCase();
+
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`
         const [rows] = await dbPool.query(query, [username]);
     
@@ -359,6 +378,9 @@ async function registerUser(dbPool, email, username, plainPassword, description 
     if (plainPassword.length <= process.env.PASSWORD_MIN_LENGTH) {
         return new Error(`Password must be at least ${process.env.PASSWORD_MIN_LENGTH} characters long`);
     }
+
+    username = username.toLowerCase();
+
     const hasValidEmail =validateEmail(email);
     if(hasValidEmail == false){ 
         return new Error("Invalid Email")
@@ -430,6 +452,8 @@ async function getThreadsFromChannel(dbPool, channelID) {
             } else {
                 row.ownerUsername = 'error: undefined'
             }
+            const msgCount = await getMessageCountOfThread(dbPool, channelID, row.id);
+            row.messageCount = msgCount;
         }
         if (rows == undefined || rows.length == 0) {
             rows = [];
@@ -493,7 +517,9 @@ async function getPublicUserInfo(dbPool, id) {
         myUser.username = privateUser.username;
         myUser.description = privateUser.description;
         myUser.Date = privateUser.registerDate;
+        myUser.lastActive = privateUser.lastActive;
         myUser.hasProfilePicture = Boolean(privateUser.hasProfilePicture);
+        myUser.countryCode = privateUser.countryCode;
         return myUser;
     } catch (err) {
         console.error("Could not convert private user to public user: ", err);
@@ -509,11 +535,20 @@ async function updateUserName(dbPool, newUsername, userID) {
         if (newUsername === undefined) { throw new Error('newUsername is required as an argument');}
         if (userID === undefined) { throw new Error('userID is required as an argument');}
 
+        newUsername = newUsername.toLowerCase();
+
         const oldUserInfo = await getPublicUserInfo(dbPool, userID);
 
         if (newUsername == oldUserInfo.username) {
             return;
         }
+
+        // check if it's taken
+        const isAlreadyUser = await getUserByUsername(dbPool, username);
+        if (isAlreadyUser != null) {
+            return 'taken';
+        }
+
         const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET username = ? WHERE id = ?`
         await dbPool.query(query, [newUsername, userID]);
 
@@ -522,8 +557,28 @@ async function updateUserName(dbPool, newUsername, userID) {
         // rename user pfp img, but only after a successful query
         const newUserPFPdir = `public/profile-pictures/${newUsername}.jpg`;
         fs.rename(oldUserPFPdir, newUserPFPdir, (err)=>{if (err) {console.error("Failed to update username:",err)}});
+
+        await updateLastActive(dbPool,userID);
+        
+        return 'success'
     } catch (err) {
         console.error("Failed to updateUsername: ", err);
+        return 'err';
+    }
+}
+
+async function updateLastActive(dbPool, userID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+    if (userID === undefined) { throw new Error('userID is required as an argument')}
+
+    try {
+        const updateLastActiveQuery = `UPDATE ${process.env.MYSQL_USER_TABLE} SET lastActive = ? WHERE id = ?`
+        const now = new Date();
+        const SQLdatetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
+        await dbPool.query(updateLastActiveQuery, [SQLdatetime, userID]);
+    } catch (err) {
+        console.error(`Failed to update user w/ id ${userID} last active date: `, err);
+        return false;
     }
 }
 
@@ -536,11 +591,27 @@ async function updateUserDescription(dbPool, newUserDescription, userID) {
 
         const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET description = ? WHERE id = ?`
         await dbPool.query(query, [newUserDescription, userID]);
-    } catch (err) {
 
+        await updateLastActive(dbPool,userID);
+    } catch (err) {
+        console.error('Failed to update user description: ', err);
     }
 }
 
+async function updateUserCountryCode(dbPool, CC, userID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+    try {
+        if (CC == undefined) {throw new Error('Country code is required as an argument')};
+        if (userID == undefined) {throw new Error('userID is required as an argument')}
+
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET countryCode = ? WHERE id = ?`
+        await dbPool.query(query, [CC, userID]);
+
+        await updateLastActive(dbPool,userID);
+    } catch (err) {
+        console.error('Failed to update user country code: ', err);
+    }
+}
 async function getMessagesFromThread(dbPool, channelID, threadID) {
     try {
         if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
@@ -589,18 +660,25 @@ async function getMessageChunkFromThread(dbPool, channelID, threadID, chunkIndex
             return [];
         }
 
+        //const rBegin = totalMessages - ((chunkIndex+1)*chunkSize) + 1;
+        //let rEnd = totalMessages - (chunkIndex*chunkSize) + 1;
+        const rBegin = roundTo(totalMessages - (chunkIndex*chunkSize) + 1, chunkSize);
+        let rEnd = roundTo(totalMessages - ((chunkIndex-1)*chunkSize) + 1, chunkSize);
+        if (rEnd < chunkSize) {
+            rEnd = chunkSize;
+        }
+
         const query = `
-            SELECT * FROM ${messageTableName} ORDER BY id DESC LIMIT ? OFFSET ?;
+            SELECT * FROM ${messageTableName} WHERE id BETWEEN ? AND ? ORDER BY id DESC;
         `;
 
-        const [rows] = await dbPool.query(query, [chunkSize, offset]);
+        const [rows] = await dbPool.query(query, [rBegin, rEnd]);
 
         for (let row of rows) {
             const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
             row.ownerUsername = publicUser.username;
             row.ownerHasProfilePicture = publicUser.hasProfilePicture;
-            const date = new Date(row.date);
-            row.date = date.toISOString();
+            row.date = row.date.toISOString();
         }
         return rows;
         
@@ -610,7 +688,7 @@ async function getMessageChunkFromThread(dbPool, channelID, threadID, chunkIndex
     }
 }
 
-async function addMessageToThread(dbPool, channelID, threadID, userID, messageContent) {
+async function addMessageToThread(dbPool, channelID, threadID, userID, messageContent, isReplyTo = null) {
     try {
         if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
         if (channelID === undefined) { throw new Error('channelID is required as an argument')}
@@ -619,14 +697,17 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
         if (messageContent === undefined) { throw new Error('messageContent is required as an argument')}
 
         const threadMessageTableName = getMessageTableNameFromThread(channelID,threadID);
-        const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, date) VALUES (?, ?, ?)`
+        const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, isReplyTo, date) VALUES (?, ?, ?, ?)`
 
         const now = new Date();
         //console.log('NOW: ', now.toISOString())
         const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
         //console.log('DATE: ', datetime)
 
-        await dbPool.query(query, [userID, messageContent, datetime]);
+        await dbPool.query(query, [userID, messageContent, isReplyTo, datetime]);
+
+        await updateLastActive(dbPool,userID);
+
     } catch (err) {
         console.error(err);
         return new Error("Failed to add message to thread" + err.toString())
@@ -659,6 +740,9 @@ async function deleteMessageFromThread(dbPool, channelID, threadID, messageID, o
             const query = `DELETE FROM ${messageTable} WHERE id = ?`;
             await dbPool.query(query, [messageID]);
         }
+
+        updateLastActive(dbPool, ownerID);
+
     } catch (err) {
         console.log("Failed to delete message from thread: ", err);
         return false;
@@ -702,7 +786,7 @@ export default {
     isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
     createChannel, getChannels, addThreadToChannel, getThreadsFromChannel, 
     getThreadFromID, deleteThread, getDescriptionFromChannel, getPublicUserInfo,
-    updateUserName, updateUserDescription, getMessagesFromThread, 
+    updateUserName, updateUserDescription, updateUserCountryCode, getMessagesFromThread, 
     getMessageChunkFromThread, addMessageToThread, deleteMessageFromThread, 
     getMessageCountOfThread, giveUserProfilePicture
 };

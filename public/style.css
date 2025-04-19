@@ -8,6 +8,7 @@
     --stdHeaderFontFamily:"Times New Roman", Georgia, serif;
     --stdMinorFontFamily:"Verdana",Geneva,sans-serif;
     --stdBorder: 1.5px solid black;
+    --stdRed: rgb(150,20,20);
     /*--stdShadowOffset:  2px 2px 0px rgba(0, 0, 0, 1). /* Horizontal, Vertical, Blur, Color */
     --stdShadow: 
         .3px .3px 0px rgba(0, 0, 0, 1),
@@ -54,7 +55,7 @@ body {
     overflow: hidden;
     display: flex; /* makes it horizontal */
     width: 100%;
-    border-bottom: 1.5px solid black;
+    border-bottom: 2px solid black;
 
 }
 
@@ -156,7 +157,7 @@ li.channelBarHandleButton p:hover{
 /*contains the create thread button, thread view counter, sort, and created by info*/
 .channelInfoBarHolder {
     position: absolute;
-    top: 84px;
+    top: 83px;
     left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth));
     min-width: var(300px);
@@ -180,8 +181,9 @@ li.channelBarHandleButton p:hover{
 
 div.channelNameHeader {
     position: absolute;
-    top: 46px;
+    top: 47px;
     border: 2px solid black;
+    border-top: 0px;
     margin-left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth) - 2px);
     display: flex;
@@ -208,7 +210,7 @@ div.channelNameHeader {
 .threadHeaderTitle {
     padding: 1px;
     margin: 3px;
-    padding-left: 5px;
+    padding-left: 0px;
     color: var(--mainTextColor);
     text-shadow: var(--stdMinorShadow);
     text-decoration: none;
@@ -218,6 +220,9 @@ div.channelNameHeader {
 /*--------------------------------------------*/
 /*MESSAGES*/
 .threadMessagesHolder {
+    overflow: hidden; /* Hide scrollbars */
+    scrollbar-width: none;
+
     position: relative; /* Parent positioning context */
     position: absolute ;
     top: 84px;
@@ -231,10 +236,12 @@ div.channelNameHeader {
     height: calc(100% - 84px);
 }
 .threadMessagesHolder ul {
+    overflow: hidden;
+    scrollbar-width: none;
+
     display: flex;
     flex-direction: column; /* Messages grow upwards */
     overflow-y: auto;
-    scrollbar-width: thin;
     list-style: none;
     margin: 0;
     margin-top: 5px;
@@ -282,10 +289,18 @@ div.channelNameHeader {
     display: inline-block;
 }
 
+.msg-reply-header-text {
+    position: absolute;
+    top: 5px; 
+    left: 45px;  
+    font-size: 10px;
+    display: inline-block;
+}
+
+
 .msg-date {
     position: absolute;
     top: 5px;   /* 10px from the top of the parent */
-    left: 55px;  /* 20px from the left of the parent */
     font-size: 10px;
     display: inline-block;
 }
@@ -308,10 +323,10 @@ div.channelNameHeader {
 /*--------------------------------------------*/
 /*CHAT BOX*/
 div.chatTypeDiv {
+    z-index: 2;
     position: fixed;
     min-height: var(--chatTypeBoxHeight);
     height: auto;
-    overflow: hidden;
     left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth) - 30px - 300px ); /* - 60px -> should be margin x 2*/ 
     background-color: var(--navBarColor);
@@ -339,6 +354,7 @@ div.chatTypeDiv {
 }
 
 .send-button {
+    z-index: 1;
     position: absolute;
     border: var(--stdBorder);
     height: calc(var(--chatTypeBoxHeight) - 6px);

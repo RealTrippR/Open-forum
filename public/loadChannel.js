@@ -303,7 +303,7 @@ function createStagingThreadAndThreadInfoHolder() {
 
         // add the search magnifying class icon
         const searchIcon = document.createElement('img');
-        searchIcon.src = '/icons/256px-Magnifying_glass_icon.svg'
+        searchIcon.src = '/icons/256px-Magnifying_glass_icon.png'
         searchIcon.width = '20';
         searchIcon.height = '20';
         searchIcon.style.position = 'absolute';

@@ -106,7 +106,7 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
             }
-            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated)})
+            res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated)})
           
         } catch (err) {
             console.error(err);
@@ -180,15 +180,18 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         
         try {
             const requestedUserPrivate = await dbUtils.getUserByUsername(dbPool, username);
+            if (requestedUserPrivate == undefined) { // user does not exist
+                return res.status(404).send();
+            } 
             const requestedUserID = requestedUserPrivate.id;
             const requestedUser = await dbUtils.getPublicUserInfo(dbPool, requestedUserID);
             const loggedIn = await req.isAuthenticated();
 
             if (req.isAuthenticated() && requestedUser.username==req.user.username) {
-                res.render('userPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(true), loggedIn: JSON.stringify(loggedIn)});
+                res.render('userPage.ejs', {user:  JSON.stringify(requestedUser), isPrivatePage: true, loggedIn: JSON.stringify(loggedIn)});
                 return;
             }
-            res.render('userPage.ejs', {user: JSON.stringify(requestedUser), isPrivatePage: JSON.stringify(false), loggedIn: loggedIn});
+            res.render('userPage.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, user: JSON.stringify(requestedUser), isPrivatePage: false, loggedIn: loggedIn});
         } catch (err) {
             console.error(err);
             res.status(500).send();
@@ -213,6 +216,7 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         }
     });
 
+    // load channel from URL
     app.get('/channels/:channelId', async (req,res) => {
         try {
             const { channelId } = req.params;
@@ -229,7 +233,7 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
             }
-            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId})
+            res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId})
           
         } catch (err) {
             console.error("Failed to load channel page: ", err);
@@ -237,6 +241,7 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
         }
     });
 
+    // load thead from URL
     app.get('/channels/:channelId/:threadId', async (req, res) => {
         try {
             const { channelId, threadId} = req.params;
@@ -252,67 +257,35 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
             }
-            res.render('index.ejs', { channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId, loadThread: threadId})
+            res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId, loadThread: threadId})
           
         } catch (err) {
             console.error("Failed to load thread page: ", err);
             res.status(500).send();
         }
     });
-    
-    /******************************************************** */
-    /* SOCKET IO */
-    
-    io.on('connection', (socket) => {
-        console.log('A user connected');
-        socket.on('send-message', async (req) => {
-            try {
-                if (socket.request.user==undefined) {
-                    return; // user is not logged in
-                }
-                if (req.message.length == 0) {
-                    return; // cannot send a blank message
-                }
-                const privateUser = await dbUtils.getUserByUsername(dbPool, socket.request.user.username);
-                const reqUserID = privateUser.id;
-                await dbUtils.addMessageToThread(dbPool, req.channelID, req.threadID, reqUserID, req.message);
-        
-                const publicUserInfo = await dbUtils.getPublicUserInfo(dbPool, reqUserID);
+    // load message from URL
+    app.get('/channels/:channelId/:threadId/messages/:messageID', async (req, res) => {
+        try {
+            const { channelId, threadId, messageID} = req.params;
+            if ((isNumeric(channelId) && isNumeric(threadId) && isNumeric(messageID)) == false) {
+                return res.status(400).send();
+            } 
+            const channels = await dbUtils.getChannels(dbPool);
 
-                socket.broadcast.emit(`#${req.threadID}new-chat-message`, {
-                    message: req.message,
-                    userInfo: publicUserInfo
-                });
+            const authenticated = await req.isAuthenticated();
 
-            } catch (err) {
-                console.error("Error handling send-message:", err);
-                socket.emit('error', 'Failed to send message.');
+            let currentUser = undefined;
+            if ( authenticated && req.user != undefined) {
+                currentUser = req.user;
             }
-        })
-
-        socket.on('delete-message', async (req) => {
-            try {
-                if (socket.request.user==undefined) {
-                    return; // user is not logged in
-                }
-                if (req.messageID==undefined) {
-                    return; // invalid message
-                }
-                const privateUser = await dbUtils.getUserByUsername(dbPool, socket.request.user.username);
-                const reqUserID = privateUser.id;
-
-                await dbUtils.deleteMessageFromThread(dbPool, req.channelID, req.threadID, req.messageID, reqUserID);
-        
-                socket.broadcast.emit(`#${req.threadID}delete-chat-message`, {
-                    messageID: req.messageID,
-                });
-            } catch (err) {
-                console.error("Error deleting message:", err);
-                socket.emit('error', 'Failed to delete message.');
-            }
-        });
+            res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId, loadThread: threadId, loadMessage: messageID})
+          
+        } catch (err) {
+            console.error("Failed to load thread page: ", err);
+            res.status(500).send();
+        }
     });
-
 }
 
 function returnToHomepageIfAuthenticated (req,res,next) {
