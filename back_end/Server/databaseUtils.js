@@ -1,6 +1,8 @@
 import bcrypt, { hash } from 'bcrypt'
 import mysql from 'mysql2'
 import fs from 'fs'
+import { channel } from 'diagnostics_channel';
+import path from 'path';
 
 function roundTo(num, multiple, direction = 'nearest') {
     if (multiple === 0) return num;
@@ -16,6 +18,11 @@ function roundTo(num, multiple, direction = 'nearest') {
     }
 }
 
+function isValidUsername(username) {
+    const valid = /^[a-zA-Z0-9_]+$/.test(username);
+    return valid;
+}
+
 async function initDB(dbPool) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
@@ -26,17 +33,21 @@ async function initDB(dbPool) {
         const USERcreateTableQuery = `
         CREATE TABLE IF NOT EXISTS ${process.env.MYSQL_USER_TABLE} (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(32) NOT NULL,
-            email VARCHAR(256) NOT NULL,
+            username VARCHAR(${process.env.USERNAME_MAX_LENGTH}) NOT NULL UNIQUE,
+            email VARCHAR(256) NOT NULL UNIQUE,
             password VARCHAR(128) NOT NULL,
             description VARCHAR(256) NOT NULL DEFAULT "",
             hasProfilePicture INT NOT NULL DEFAULT 0,
-            isAdmin INT NOT NULL DEFAULT 0,
+            isAdmin TINYINT NOT NULL DEFAULT 0,
             registerDate DATETIME NOT NULL,
             countryCode VARCHAR(2) DEFAULT NULL,
-            lastActive DATETIME DEFAULT NULL
+            lastActive DATETIME DEFAULT NULL,
+
+            resetToken VARCHAR(255) DEFAULT NULL,
+            resetTokenExpiration DATETIME DEFAULT NULL
         );`;
         await dbPool.query(USERcreateTableQuery);
+
         const CHANNELcreateTableQuery = `
         CREATE TABLE IF NOT EXISTS ${process.env.MYSQL_CHANNEL_TABLE} (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -55,6 +66,31 @@ async function initDB(dbPool) {
         ) ENGINE=InnoDB`
         await dbPool.query(SESSIONcreateTableQuery);
 
+        const MUTED_CHANNELS_createTableQuery = `
+        CREATE TABLE IF NOT EXISTS UserMutedChannels (
+            userID INT NOT NULL,
+            channelID INT NOT NULL,
+            PRIMARY KEY (userID, channelId),
+            FOREIGN KEY (userID) REFERENCES ${process.env.MYSQL_USER_TABLE}(id),
+            FOREIGN KEY (channelID) REFERENCES ${process.env.MYSQL_CHANNEL_TABLE}(id)
+        );
+        `
+        await dbPool.query(MUTED_CHANNELS_createTableQuery); 
+
+        const UNREAD_PINGS_createTableQuery = `
+        CREATE TABLE IF NOT EXISTS UserUnreadPings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userID INT NOT NULL,
+            channelID INT NOT NULL,
+            threadID INT NOT NULL,
+            messageID INT NOT NULL,
+            fromUser VARCHAR(${process.env.USERNAME_MAX_LENGTH}) NOT NULL,
+            date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (userId) REFERENCES ${process.env.MYSQL_USER_TABLE}(id),
+            FOREIGN KEY (channelId) REFERENCES ${process.env.MYSQL_CHANNEL_TABLE}(id)
+        );
+        `
+        await dbPool.query(UNREAD_PINGS_createTableQuery); 
 
     } catch (err) {
         console.error('Error initializing database:', err);
@@ -82,12 +118,18 @@ async function initChannels(dbPool) {
     }
 }
 
-async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearUsers = true)
+async function clearDB(dbPool, clearSessions = true, clearThreadsAndChannels = true, clearUsers = true)
 {
+    if (dbPool === undefined) {
+        throw new Error('dbPool is required as an argument');
+    }
+    // select the FORUM database
+    await dbPool.query(`use ${process.env.MYSQL_DATABASE}`)
+    
+    // clear profile pictures
     if (clearUsers) {
         const pfpDir = 'public/profile-pictures';
         if (fs.existsSync(pfpDir)){
-            // clear profile pictures
             fs.rmSync(pfpDir, { recursive: true, force: true });
         }
 
@@ -95,10 +137,33 @@ async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearU
         fs.mkdirSync(pfpDir);
     }
 
+    // remove any img message attachments
+    if (clearThreadsAndChannels) {
+        const msgAttachDir = 'public/msgImgAttachments';
+        if (fs.existsSync(msgAttachDir)){
+            fs.rmSync(msgAttachDir, { recursive: true, force: true });
+        }
+
+        // recreate msg attachmetn folder
+        fs.mkdirSync(msgAttachDir);
+    }
+
+
+    if (clearUsers || clearThreadsAndChannels) {
+        // delete unread pings
+        const deleteUserUnreadPingsQuery = `DROP TABLE IF EXISTS UserUnreadPings;`;
+        await dbPool.query(deleteUserUnreadPingsQuery);
+
+        // delete UserMutedChannels
+        const userMutedChannels = `DROP TABLE IF EXISTS UserMutedChannels;`;
+        await dbPool.query(userMutedChannels)
+    }
+        
+            
     const channels = await getChannels(dbPool);
     if (channels !== undefined) {
         for (let channel of channels) {
-            if (clearThreads) {
+            if (clearThreadsAndChannels) {
                 try {
                     // delete messages for all threads in that channel
                     const threads = await getThreadsFromChannel(dbPool,channel.id);
@@ -118,6 +183,10 @@ async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearU
                     await dbPool.query(resetAutoIncQuery)
                     } catch (err) {}
 
+                     // delete UserMutedChannels
+                    const userMutedChannels = `DROP TABLE IF EXISTS UserMutedChannels;`;
+                    await dbPool.query(userMutedChannels)
+
                     const deleteThreadTableQuery = `DROP TABLE IF EXISTS ${threadTableName}`;
                     await dbPool.query(deleteThreadTableQuery);
                 } catch (err) {
@@ -129,11 +198,7 @@ async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearU
     }
 
     
-    if (dbPool === undefined) {
-        throw new Error('dbPool is required as an argument');
-    }
-    // select the FORUM database
-    await dbPool.query(`use ${process.env.MYSQL_DATABASE}`)
+    
 
     if (clearUsers) {
         // delete all from database
@@ -141,8 +206,10 @@ async function clearDB(dbPool, clearSessions = true, clearThreads = true, clearU
         await dbPool.query(deleteAllUsersQuery)
     }
 
-    const deleteAllChannelsQuery =  `DROP TABLE IF EXISTS ${process.env.MYSQL_CHANNEL_TABLE};`;
-    await dbPool.query(deleteAllChannelsQuery)
+    if (clearThreadsAndChannels) {
+        const deleteAllChannelsQuery =  `DROP TABLE IF EXISTS ${process.env.MYSQL_CHANNEL_TABLE};`;
+        await dbPool.query(deleteAllChannelsQuery)
+    }
 
     if (clearSessions){
         const dropSessionsQuery = 'DROP TABLE IF EXISTS sessions';
@@ -172,11 +239,19 @@ async function createChannel(dbPool, name, description) {
     const createChannelQuery = `INSERT INTO ${process.env.MYSQL_CHANNEL_TABLE} (name, threadListID, description) VALUES (?, ?, ?)`;
 
     const [result] = await dbPool.execute(createChannelQuery, [name, threadListChannelId, description]);
+    const channelID = result.insertId;
     console.log(`Created channel ${name} successfully`);
 
-    createThreadTableForChannel(dbPool, result.insertId);
 
-    return result.insertId;
+    // create msg attachment folder for this channel
+    const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`);
+    fs.mkdirSync(msgAttachDir);
+    
+
+    createThreadTableForChannel(dbPool, channelID);
+
+
+    return channelID;
 }
 
 async function createThreadTableForChannel(dbPool, channelID) {
@@ -207,7 +282,9 @@ async function createMessageTableForThread(dbPool, channelID, threadID) {
         ownerID INT,
         content VARCHAR(4096),
         isReplyTo INT DEFAULT NULL,
-        date DATETIME
+        date DATETIME,
+        hasImg TINYINT(1) DEFAULT 0,
+        imgExt VARCHAR(4) DEFAULT NULL
     )
     `
 
@@ -237,10 +314,15 @@ async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescr
     const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
     
     const [result] = await dbPool.query(addThreadQuery, [threadOwnerID, threadName, threadDescription, datetime]);
-    await createMessageTableForThread(dbPool, channelID, result.insertId);
+    const newThreadID = result.insertId;
+    await createMessageTableForThread(dbPool, channelID, newThreadID);
     
     updateLastActive(dbPool, threadOwnerID);
 
+    // create msg attachment folder for this channel
+    const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`,`${newThreadID}`);
+    fs.mkdirSync(msgAttachDir);
+    
     return result.insertId;
 }
 
@@ -288,17 +370,6 @@ async function isEmailInUse(dbPool, email) {
     return false;
 }
 
-async function doesUserExist(dbPool, username) {
-    if (dbPool === undefined) {
-        throw new Error('dbPool is required as an argument');
-    }
-    const id = await getUserIDfromUsername(dbPool, [username]);
-    if (id !== undefined) {
-        return false;
-    } else {
-        return true;
-    }
-}
 // returns the User's ID if the user exists, otherwise returns undefined
 async function getUserIDfromUsername(dbPool, username) {
     if (dbPool === undefined) {
@@ -307,7 +378,7 @@ async function getUserIDfromUsername(dbPool, username) {
     try {
         username = username.toLowerCase();
 
-        const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`
+        const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE LOWER(username) = LOWER(?)`
         const [rows] = await dbPool.query(query, [username]);
     
         if (rows == undefined) {
@@ -356,12 +427,68 @@ async function getUserByUsername(dbPool, username) {
     }
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE username = ?`;
-        const [rows] = await dbPool.query(query, [username]);
+        const [rows] = await dbPool.query(query, [username.toLowerCase()]);
         return rows[0]; // return the first matching user
-    } catch {
-        console.log("Could not get user from username", username);
+    } catch (err) {
+        console.error("Could not get user from username - ", username, ' ', err);
     }
     return undefined;
+}
+
+// token: hex string
+// expiration date: Date obj
+// returns false upon failure, otherwise returns nothing
+async function setUserPasswordResetToken(dbPool, userID, token, expirationDate) {
+    try {
+        if (dbPool == undefined) {throw new Error("dbPool is required as an argument")};
+        if (userID == undefined) {throw new Error("userID is required as an argument")};
+        if (token == undefined) {throw new Error("token is required as an argument")};
+        if (expirationDate == undefined) {throw new Error("expirationDate is required as an argument")};
+
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET resetToken = ?,resetTokenExpiration = ? WHERE id = ?`
+        
+        const tokenExpirationDate = expirationDate.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
+        dbPool.execute(query, [token, tokenExpirationDate, userID])
+    } catch (err) {
+        console.error("Failed to set user password reset token: ",err);
+        return false;
+    }
+}
+
+// returns false if it fails, otherwise returns nothing
+async function resetUserPasswordResetToken(dbPool, userID) {
+    try {
+        if (dbPool == undefined) {throw new Error("dbPool is required as an argument")};
+        if (userID == undefined) {throw new Error("userID is required as an argument")};
+
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET resetToken = NULL, resetTokenExpiration = NULL WHERE id = ?`
+        
+        dbPool.execute(query, [userID])
+    } catch (err) {
+        console.error("Failed to reset user password reset token: ",err);
+        return false;
+    }
+}
+
+// returns false if it fails, otherwise returns nothing
+async function updateUserPassword(dbPool, userID, newPassword) {
+    try {
+        if (dbPool == undefined) {throw new Error("dbPool is required as an argument")};
+        if (userID == undefined) {throw new Error("userID is required as an argument")};
+        if (newPassword == undefined) {throw new Error("newPassword is required as an argument")};
+
+        if (newPassword.length < process.env.PASSWORD_MIN_LENGTH) {
+            return false;
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, process.saltRounds);
+
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET password = ? WHERE id = ?`;
+        await dbPool.execute(query, [hashedPassword, userID]);
+    } catch (err) {
+        console.error("Failed to update user password: ",err);
+        return false;
+    }
 }
 
 // returns the ID of the created user, returns error or undefined if it fails to get user or if the user already exists
@@ -372,22 +499,22 @@ async function registerUser(dbPool, email, username, plainPassword, description 
     if (username == null || email == null || plainPassword == null) {
         return new Error("Enter valid data"); // invalid data passed into function
     }
-    if (username.length <= process.env.USERNAME_MIN_LENGTH) {
+    if (username.length < process.env.USERNAME_MIN_LENGTH) {
         return new Error(`Username must be at least ${process.env.USERNAME_MIN_LENGTH} characters long`);
     }
-    if (plainPassword.length <= process.env.PASSWORD_MIN_LENGTH) {
+    if (plainPassword.length < process.env.PASSWORD_MIN_LENGTH) {
         return new Error(`Password must be at least ${process.env.PASSWORD_MIN_LENGTH} characters long`);
     }
-
-    username = username.toLowerCase();
-
+    
+    const validusername = isValidUsername(username);
+    if (!validusername) {
+        return new Error("Invalid Username");
+    }
     const hasValidEmail =validateEmail(email);
     if(hasValidEmail == false){ 
         return new Error("Invalid Email")
     }
-    const tmp = await getUserIDfromUsername(dbPool, username);
-    const isNameTaken = tmp!== undefined;
-    console.log('isTaken? ', isNameTaken);
+    const isNameTaken = await isUsernameTaken(dbPool, username);
     if (isNameTaken) {
         return new Error("Username is taken");
     }
@@ -425,6 +552,16 @@ async function getThreadLastActiveDate(dbPool, channelID, threadID) {
     } catch (err) {
         console.error('Failed to get last active date: ', err);
         return false;
+    }
+}
+
+async function isUsernameTaken(dbPool, username) {
+    try {
+        const u = await getUserByUsername(dbPool, username);
+        return (u!=undefined);
+    } catch (err) {
+        console.error(err);
+        return true;
     }
 }
 
@@ -489,6 +626,11 @@ async function deleteThread(dbPool, channelID, threadID) {
 
         const deleteThreadQuery = `DELETE FROM ${threadTableName} WHERE id = ?`;
         await dbPool.query(deleteThreadQuery, [threadID]);
+
+        // create msg attachment folder for this channel
+        const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`,`${newThreadID}`);
+        fs.mkdirSync(msgAttachDir);
+
     } catch (err) {
         console.error("Failed to delete thread: ", err);
         return false;
@@ -527,6 +669,44 @@ async function getPublicUserInfo(dbPool, id) {
     }
 }
 
+async function updateUserMutedChannel(dbPool, channelID, userID, muted /*bool*/) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
+    try {
+        if (muted) {
+            // Insert the mute relationship if not already there
+            await dbPool.query(
+                `INSERT IGNORE INTO UserMutedChannels (userId, channelId) VALUES (?, ?)`,
+                [userID, channelID]
+            );
+        } else {
+            // Remove the mute relationship
+            await dbPool.query(
+                `DELETE FROM UserMutedChannels WHERE userId = ? AND channelId = ?`,
+                [userID, channelID]
+            );
+        }
+    } catch (err) {
+        console.error('Failed to update muted channels: ', err);
+    }
+}
+
+async function getUserMutedChannels(dbPool, userID) {
+    try {
+        const [rows] = await dbPool.query(
+            `SELECT channelId FROM UserMutedChannels WHERE userId = ?`,
+            [userID]
+        );
+        let result = [];
+        for (let obj of rows) { // convert to an array of ints
+            result.push(obj.channelId);
+        }
+        return result;
+    } catch (err) {
+        console.error('Failed to get muted channels: ', err);
+    }
+    return [];
+}
+
 //
 async function updateUserName(dbPool, newUsername, userID) {
     if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
@@ -535,19 +715,21 @@ async function updateUserName(dbPool, newUsername, userID) {
         if (newUsername === undefined) { throw new Error('newUsername is required as an argument');}
         if (userID === undefined) { throw new Error('userID is required as an argument');}
 
-        newUsername = newUsername.toLowerCase();
 
         const oldUserInfo = await getPublicUserInfo(dbPool, userID);
 
         if (newUsername == oldUserInfo.username) {
             return;
         }
-
-        // check if it's taken
-        const isAlreadyUser = await getUserByUsername(dbPool, username);
-        if (isAlreadyUser != null) {
-            return 'taken';
+        // isUsernameTaken is case insenstive, and therefore if the user wants to only change the cases of their username an extra check is needed
+        if ((oldUserInfo.username.toLowerCase() == oldUserInfo.username.toLowerCase()) == false ) {
+            const isAlreadyUser = await isUsernameTaken(dbPool,newUsername);
+            if (isAlreadyUser == true) {
+                return 'taken';
+            }
         }
+
+
 
         const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET username = ? WHERE id = ?`
         await dbPool.query(query, [newUsername, userID]);
@@ -683,12 +865,12 @@ async function getMessageChunkFromThread(dbPool, channelID, threadID, chunkIndex
         return rows;
         
     } catch (err) {
-        console.error("Failed to get message chunk from thread: ", err);
+        //console.error("Failed to get message chunk from thread: ", err);
         return undefined;
     }
 }
 
-async function addMessageToThread(dbPool, channelID, threadID, userID, messageContent, isReplyTo = null) {
+async function addMessageToThread(dbPool, channelID, threadID, userID, messageContent, isReplyTo = null, imgData = null) {
     try {
         if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
         if (channelID === undefined) { throw new Error('channelID is required as an argument')}
@@ -697,14 +879,43 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
         if (messageContent === undefined) { throw new Error('messageContent is required as an argument')}
 
         const threadMessageTableName = getMessageTableNameFromThread(channelID,threadID);
-        const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, isReplyTo, date) VALUES (?, ?, ?, ?)`
+        const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, isReplyTo, hasImg, imgExt, date) VALUES (?, ?, ?, ?, ?, ?)`
 
         const now = new Date();
         //console.log('NOW: ', now.toISOString())
         const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
         //console.log('DATE: ', datetime)
 
-        await dbPool.query(query, [userID, messageContent, isReplyTo, datetime]);
+        let hasImg = 0;
+        let imgExt = null;
+        if (imgData != null) {
+            hasImg = 1;
+            // Extract the image format from the data URI
+            const match = imgData.match(/^data:image\/(png|jpg|jpeg|gif);base64,/);
+            imgExt = match ? match[1] : 'png';  // Default to 'png' if not found
+        }
+
+        const [result] = await dbPool.query(query, [userID, messageContent, isReplyTo, hasImg, imgExt, datetime]);
+        const messageID = result.insertId;
+        //     const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`);
+
+        if (imgData != null) {
+
+            // Remove the data URI scheme prefix and decode the base64 data
+            const base64Data = imgData.replace(/^data:image\/(png|jpg|jpeg|gif);base64,/, '');
+            const imageBuffer = Buffer.from(base64Data, 'base64');
+
+            const filePath = path.join('public/msgImgAttachments', `${channelID}`, `${threadID}`, `${messageID}.${imgExt}`); // Save in the 'uploads' folder
+            
+            // Save the image file to disk
+            fs.writeFile(filePath, imageBuffer, (err) => {
+                if (err) {
+                    console.error('Error saving image attachedd to a message:', err);
+                } else {
+                    //console.log(`Image saved to ${filePath}`);
+                }
+            });
+        }
 
         await updateLastActive(dbPool,userID);
 
@@ -781,12 +992,91 @@ async function giveUserProfilePicture(dbPool, userID) {
     }
 }
 
+async function getUnreadPingsFromUser(dbPool, userID) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (userID === undefined) { throw new Error('userID is required as an argument')}
+
+        `   Table UserUnreadPings:::
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userID INT NOT NULL,
+            channelID INT NOT NULL,
+            threadID INT NOT NULL,
+            messageID INT NOT NULL,
+            fromUser VARCHAR(${process.env.USERNAME_MAX_LENGTH}) NOT NULL,
+            date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (userID) REFERENCES ${process.env.MYSQL_USER_TABLE}(id),
+            FOREIGN KEY (channelID) REFERENCES ${process.env.MYSQL_CHANNEL_TABLE}(id)
+        `
+        const query = 'SELECT * FROM UserUnreadPings WHERE userID = ?'
+        const [rows] = await dbPool.query(query, [userID]);
+        if (rows == undefined) {
+            rows = [];
+        }
+        return rows;
+    } catch (err) {
+        console.log('Error getting unread pings of user: ', err);
+        return undefined;
+    }
+}
+
+
+/* a ping struct is like so:
+{
+    from: <username>
+    channelID: <number>
+    threadID: <number>
+    messageSlice: <string. 32 chars max>
+    messageID: <number>
+}
+*/
+async function addUnreadPingToUser(dbPool, userID, pingObj) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (userID === undefined) { throw new Error('userID is required as an argument')}
+        if (pingObj === undefined) { throw new Error('pingObj is required as an argument')}
+        
+        `
+            Table UserUnreadPings:::
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userID INT NOT NULL,
+            channelID INT NOT NULL,
+            threadID INT NOT NULL,
+            messageID INT NOT NULL,
+            fromUser VARCHAR(${process.env.USERNAME_MAX_LENGTH}) NOT NULL,
+            date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (userID) REFERENCES ${process.env.MYSQL_USER_TABLE}(id),
+            FOREIGN KEY (channelID) REFERENCES ${process.env.MYSQL_CHANNEL_TABLE}(id)
+        `
+        const query = 'INSERT INTO UserUnreadPings (userID, channelID, threadID, messageId, fromUser) VALUES (?,?,?,?,?)'
+        await dbPool.query(query, [userID, pingObj.channelID, pingObj.threadID, pingObj.messageID, pingObj.from]);
+    } catch (err) {
+        console.error("Failed to add unread ping to user: ", err);
+        return undefined;
+    }
+}
+
+async function removeUnreadPingsOfUserFromThread(dbPool, userID, channelID, threadID) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (userID === undefined) { throw new Error('userID is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+
+        const query = `DELETE FROM UserUnreadPings WHERE userID = ? AND channelID = ? AND threadID = ?`;
+        await dbPool.query(query, [userID, channelID, threadID]);
+    } catch (err) {
+        console.error("Failed to remove unread ping of user: ", err);
+        return undefined;
+    }
+}
 export default {
-    initDB, clearDB, initChannels, getChannelCount, registerUser, 
-    isEmailInUse, getUserByUsername, getUserFromID, doesUserExist, 
-    createChannel, getChannels, addThreadToChannel, getThreadsFromChannel, 
+    initDB, clearDB, initChannels, getChannelCount, registerUser, updateUserPassword,
+    isEmailInUse, getUserByUsername, getUserFromID, isUsernameTaken, resetUserPasswordResetToken,
+    setUserPasswordResetToken, createChannel, getChannels, addThreadToChannel, getThreadsFromChannel, 
     getThreadFromID, deleteThread, getDescriptionFromChannel, getPublicUserInfo,
     updateUserName, updateUserDescription, updateUserCountryCode, getMessagesFromThread, 
     getMessageChunkFromThread, addMessageToThread, deleteMessageFromThread, 
-    getMessageCountOfThread, giveUserProfilePicture
+    getMessageCountOfThread, giveUserProfilePicture, updateUserMutedChannel, getUserMutedChannels,
+    getUnreadPingsFromUser, addUnreadPingToUser, removeUnreadPingsOfUserFromThread
 };

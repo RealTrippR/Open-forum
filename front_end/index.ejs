@@ -22,6 +22,7 @@
 </script>
 <!-- load webpage content -->
 <script src="/loadNavbar.js"> </script>
+<script src="/notifications.js"></script>
 <script src="/loadThread.js"> </script>
 <script src="/loadChannelBar.js"> </script>
 <script src="/loadChannel.js" ></script>
@@ -29,10 +30,27 @@
 
 <script>
 
+    function getChannelFromID(id) {
+        for (let channel of window.channels) {
+            if (channel.id == id) {
+                return channel;
+            }
+        }
+        return null;
+    }
+
     function loadPage() {
         
         
-        window.user = <%- user %>
+        window.user = undefined
+        <% if (locals.user) { %>
+            window.user = <%- user %>;
+        <% } %>
+        
+        if (window.user != undefined && window.user.unreadPings == undefined) {
+            window.user.unreadPings = []; // temp
+        }
+
         window.loggedIn = <%- loggedIn %>
         window.messageChunkSize = <%- messageChunkSize %>
 
@@ -76,10 +94,10 @@
                 if (_loadThread != undefined) {
 
                     if (_loadMessage != undefined) {
-                        await setCurrentThread(_loadThread,true,false);
+                        await setCurrentThreadID(_loadThread,true,false);
                         await goToMessage(_loadMessage);
                     } else {
-                        await setCurrentThread(_loadThread);
+                        await setCurrentThreadID(_loadThread);
                     }
                 }
             })();
@@ -93,6 +111,8 @@
         loadPage();
         loadCopyright(true);
     };
+
+    socket.on(`ping-recieve`, recievePingFromServer)
 
     window.addEventListener('popstate', (event) => {
     const state = event.state;

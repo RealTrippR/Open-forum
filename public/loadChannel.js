@@ -140,6 +140,7 @@ function createStagingThreadAndThreadInfoHolder() {
             div.style.height = '26px';
             div.style.border = 'var(--stdBorder)'
             div.style.display = 'flex'
+            div.style.minWidth = '200px'
             div.style.width = '200px';
             
             const p = document.createElement('p');
@@ -256,6 +257,7 @@ function createStagingThreadAndThreadInfoHolder() {
         searchInput.type = 'text';
         searchInput.id = 'search-input';
         searchInput.className = 'stdText';
+        searchInput.classList.add('placeholder');
         searchInput.style.position = 'relative'
         searchInput.style.backgroundColor = 'transparent'
         searchInput.style.left = '0px'
@@ -372,41 +374,74 @@ async function loadThreads(threads) {
         thh.appendChild(desc); // add <p> to the <div>
         
         {
-            if (window.user == undefined || thread.ownerUsername == window.user.username) {
-                const deleteThreadButton = document.createElement('button');
-                deleteThreadButton.id = 'deleteThreadButton';
-                deleteThreadButton.style.position = 'absolute';
-                deleteThreadButton.className = 'deleteThreadButton';
-                deleteThreadButton.style.backgroundColor = 'var(--navBarColor)';
-                deleteThreadButton.style.margin = '5px';
-                deleteThreadButton.style.marginLeft =  `${title.clientWidth + title.offsetLeft + 5}px`;
-                deleteThreadButton.dataset.threadID = thread.id;
-                deleteThreadButton.dataset.channelID = window.currentChannel.id;
-                deleteThreadButton.style.zIndex = 500;
+            if (window.user != undefined) {
+                        // if there is an unread ping on this thread, add the icon
+                const unreadPingCountForThisThread = (window.user.unreadPings.filter((ping) => (ping.channelID == window.currentChannel.id && ping.threadID == thread.id))).length;
+                console.log('loading channel: ', window.user.unreadPings,unreadPingCountForThisThread)
+                if (thread.ownerUsername == window.user.username) {
+                    const deleteThreadButton = document.createElement('button');
+                    deleteThreadButton.id = 'deleteThreadButton';
+                    deleteThreadButton.style.position = 'absolute';
+                    deleteThreadButton.className = 'deleteThreadButton';
+                    deleteThreadButton.style.backgroundColor = 'var(--navBarColor)';
+                    deleteThreadButton.style.margin = '5px';
+                    deleteThreadButton.style.marginLeft =  `${title.clientWidth + title.offsetLeft + 5}px`;
+                    deleteThreadButton.dataset.threadID = thread.id;
+                    deleteThreadButton.dataset.channelID = window.currentChannel.id;
+                    deleteThreadButton.style.zIndex = 500;
 
-                const deleteIcon = document.createElement('img');
-                deleteIcon.width = 20;
-                deleteIcon.height = 20;
-                deleteIcon.src = '\\icons\\delete-icon.png';
-                
-                deleteThreadButton.appendChild(deleteIcon);
+                    const deleteIcon = document.createElement('img');
+                    deleteIcon.width = 20;
+                    deleteIcon.height = 20;
+                    deleteIcon.src = '\\icons\\delete-icon.png';
+                    
+                    deleteThreadButton.appendChild(deleteIcon);
 
-                thh.appendChild(deleteThreadButton);
-                
-                deleteThreadButton.addEventListener('click', (event) => {
+                    thh.appendChild(deleteThreadButton);
                     
-                    const channel_id = deleteThreadButton.dataset.channelID;
-                    const thread_id = deleteThreadButton.dataset.threadID;
-                    askServerToDeleteThread(channel_id, thread_id);
-                    window.threads = window.threads.filter(item => (thread_id == item.threadID));
-                    
-                    for (let thh of threadsHolder.children) {
-                        if (thh.dataset.threadID == thread_id) {
-                            thh.remove();
+                    deleteThreadButton.addEventListener('click', (event) => {
+                        
+                        const channel_id = deleteThreadButton.dataset.channelID;
+                        const thread_id = deleteThreadButton.dataset.threadID;
+                        askServerToDeleteThread(channel_id, thread_id);
+                        window.threads = window.threads.filter(item => (thread_id == item.threadID));
+                        
+                        for (let thh of threadsHolder.children) {
+                            if (thh.dataset.threadID == thread_id) {
+                                thh.remove();
+                            }
                         }
-                    }
-                    event.stopPropagation(); // prevent fallthrough to the button below
-                });
+                        event.stopPropagation(); // prevent fallthrough to the button below
+                    });
+                }
+
+                
+                const notisCountDiv = document.createElement('div');
+                notisCountDiv.className = 'notisIconDiv';
+                notisCountDiv.style.width = '20px';
+                notisCountDiv.style.position = 'absolute';
+                notisCountDiv.style.height = '20px';
+                notisCountDiv.style.marginTop = '7px';
+                let offsetL = 5;
+                if (thread.ownerUsername == window.user.username) { // account for delete button
+                    offsetL = 45;
+                }
+                notisCountDiv.style.marginLeft = `${title.clientWidth + title.offsetLeft + offsetL}px`;
+
+                if (unreadPingCountForThisThread>0) {
+                    notisCountDiv.style.display = 'block'
+                } else {
+                    notisCountDiv.style.display = 'none' // no unread pings for this thread
+                }
+                const notisCountP = document.createElement('p');
+                notisCountP.className = 'stdText';
+                notisCountP.textContent = `${unreadPingCountForThisThread}`;
+                notisCountP.style.margin = 'auto';
+                notisCountP.style.color = 'var(--mainTextColor)'
+                notisCountP.style.fontSize = '15px'
+    
+                notisCountDiv.appendChild(notisCountP);
+                thh.appendChild(notisCountDiv);
             }
         }
 

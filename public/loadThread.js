@@ -22,7 +22,26 @@ function setReplyingTo(msgElement) {
         HTML += `<img src='/icons/ReplyArrow.png' width=30 height=30 id='replyIcon' style='position: absolute; margin: 0; padding: 0; left: -4px; top: 3px;'>`;
         HTML += `<p class = "stdText" style="font-size: 11px; margin-left: 22px; text-align: left;">  </p> `;
         replyMsgDiv.innerHTML  = HTML;
-        replyMsgDiv.children[1].innerText = `Replying To: ${msgElement.children[1].innerHTML}`
+
+
+        
+
+        let elemText = "";
+
+        // Include direct text inside the span (not children) to combine mentions and the actual msg content into 1 string
+        for (let node of msgElement.children[3].childNodes) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            elemText += node.textContent;
+          } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN") {
+            elemText += node.innerText;
+          }
+        }
+      
+        //return combinedText;
+        if (elemText.length > 20) {
+            elemText = elemText.slice(0,20) + `...`
+        }
+        replyMsgDiv.children[1].innerText = `Replying To: ${msgElement.children[1].innerHTML}` + `  | ` + `${elemText}`
     }
 }
 
@@ -121,7 +140,16 @@ async function getThreadMessagesFromServer(channelID, threadID) {
     })();
 }
 
-function sendMessage(message) {
+function sendMessage(message, imgData = null, imgURL = null) {
+
+    const msgUL = document.getElementById('message-UL');
+    const lastElem = msgUL.children[msgUL.children.length-1];
+    let lastID;
+    if (lastElem != undefined) {
+        lastID = Number(lastElem.dataset.messageID);
+    } else {
+        lastID = 0;
+    }
 
     window.currentThread.messageCount += 1;
             
@@ -137,23 +165,16 @@ function sendMessage(message) {
     });
 
     for (let username in pingUsers) {
-        pingUser(username.slice(1))
+        pingUser(username.slice(1), message, lastID+1);
     }
 
-    socket.emit('send-message', {message: message, channelID: window.currentChannel.id, threadID: window.currentThreadID, isReplyTo: getReplyingTo()});
+    socket.emit('send-message', {message: message, channelID: window.currentChannel.id, threadID: window.currentThreadID, isReplyTo: getReplyingTo(), imgData: imgData});
 
     const now = new Date();
     const datetime = now.toISOString()
 
-    const msgUL = document.getElementById('message-UL');
-    const lastElem = msgUL.children[msgUL.children.length-1];
-    let lastID;
-    if (lastElem != undefined) {
-        lastID = Number(lastElem.dataset.messageID);
-    } else {
-        lastID = 0;
-    }
-    addMessageToMessageHolder(message, datetime, window.user, lastID+1, false, getReplyingTo());
+
+    addMessageToMessageHolder(message, datetime, window.user, lastID+1, false, getReplyingTo(), imgURL);
 }
 
 function deleteMessage(messageID, messageElement /*optional*/) {
@@ -177,18 +198,25 @@ function recieveMessageFromServer(req) {
     window.currentThread.messageCount += 1;
     const now = new Date();
     const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
-    addMessageToMessageHolder(req.message, datetime, req.userInfo);
+
+    const msgUL = document.getElementById('message-UL');
+    const lastElem = msgUL.children[msgUL.children.length-1];
+    let lastID;
+    if (lastElem != undefined) {
+        lastID = Number(lastElem.dataset.messageID);
+    } else {
+        lastID = 0;
+    }
+
+    let imgURL = null;
+    addMessageToMessageHolder(req.message, datetime, req.userInfo, lastID+1, false, req.isReplyTo, imgURL);
 }
 
 
-function pingUser(username) {
-    socket.emit('ping-user', {targetUsername: username, channelID: window.currentChannel.id, threadID: window.currentThreadID});
+function pingUser(username, message, messageID) {
+    message = message.slice(0,32);
+    socket.emit('ping-user', {targetUsername: username, channelID: window.currentChannel.id, threadID: window.currentThreadID, messageID: messageID, messageSlice: message});
 }
-
-function recievePingFromServer(req) {
-    console.log('ping: ', req);
-}
-
 
 function deleteChatMessageAtServerRequest(req) {
     window.currentThread.messageCount -= 1;
@@ -205,7 +233,7 @@ function getCurrentThreadID() {
     return window.currentThreadID;
 }
 
-function addMessageToMessageHolder(message, messageDateTime, messageOwner, messageID, insertToBeginning=false, isReplyTo = null) {
+function addMessageToMessageHolder(message, messageDateTime, messageOwner, messageID, insertToBeginning=false, isReplyTo = null, imgURL = null) {
     if (message == undefined) {console.error("message is required as an argument")};
     if (messageDateTime == undefined) {console.error("messageDateTime is required as an argument")}
     if (messageOwner == undefined) {console.error("messageOwner is required as an argument")}
@@ -215,7 +243,7 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
     const relativeDate = getRelativeTimeStr(messageDateTime);
     const msgUL = document.getElementById('message-UL');
     
-      
+    
     // load PFP
     let pfpImgSrc = "\\icons\\default-pfp.png";
 
@@ -325,12 +353,27 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
                 textSpan.appendChild(mentionSpan);
             } else {
                 textSpan.appendChild(document.createTextNode(part));
+            }
+        });
+
+        let img = undefined;
+        if (imgURL != null) {
+            console.log('img url: ', imgURL) 
+
+            // Staging Image
+            img = document.createElement('img');
+            img.style.width = 'auto'; 
+            img.height = 250;
+            img.style.border = 'var(--stdBorder)';
+            img.style.boxShadow = 'var(--stdMinorShadow)';
+            img.style.display = 'block'; // prevents margin collapse with wrapper
+            img.src = imgURL;
         }
-    });
 
         li.appendChild(profileDiv);
         li.appendChild(usernameSpan);
         li.appendChild(dateSpan);
+        if (img) li.appendChild(img);
         li.appendChild(textSpan);
 
         if (insertToBeginning == true) {
@@ -445,6 +488,8 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
 
 // opens the thread by ID, by default it only loads the first chunk
 async function loadThreadFromID(threadID,loadFirstTwoChunks=true) {
+    threadID = Number(threadID);
+    removeUnreadPingsFromThread(window.currentChannel.id,threadID)
 
     window.loadedChunkIndices = [];
 
@@ -469,7 +514,7 @@ async function loadThreadFromID(threadID,loadFirstTwoChunks=true) {
 
 async function setCurrentThreadFromThreadHandleButton() {
     const btn = event.currentTarget; // The clicked <li> element
-    await setCurrentThread(btn.dataset.threadID);
+    await setCurrentThreadID(btn.dataset.threadID);
 }
 
 function initMessageHolder() {
@@ -487,10 +532,97 @@ function initMessageHolder() {
     chatTypeBoxDiv.className = 'chatTypeDiv'
     chatTypeBoxDiv.style.display = 'none';
     document.body.appendChild(chatTypeBoxDiv);
-    
+
     chatTypeBoxDiv.style.alignItems = 'stretch';
     chatTypeBoxDiv.innerHTML = `
     <button type="submit" id="send-button" class="send-button">Send</button>`;
+
+
+    const msgContentHolderDivOuter = document.createElement('div');
+    msgContentHolderDivOuter.style.display = 'flex';
+    msgContentHolderDivOuter.style.flexDirection = 'column';
+    msgContentHolderDivOuter.style.width = '100%';
+    
+
+    {
+        // invis file uploader
+        const HTML = '<input type="file" id="upload-img-attachment" style="display: none">';
+        document.body.insertAdjacentHTML("beforeend", HTML);
+        /************************************************************/
+        /* UPLOAD ATTACHMENTS */
+        const attachImgToMessageButton = document.createElement('button');
+        attachImgToMessageButton.style.marginTop = '3px';
+        attachImgToMessageButton.style.marginLeft = '3px';
+        attachImgToMessageButton.style.width = '34px';
+        attachImgToMessageButton.style.height = '34px';
+        attachImgToMessageButton.style.background = 'var(--navBarColor)'
+        attachImgToMessageButton.style.border = 'var(--stdBorder)';
+        attachImgToMessageButton.style.boxShadow = 'var(--stdMinorShadow)';
+        attachImgToMessageButton.style.cursor = 'pointer';
+        attachImgToMessageButton.style.bottom = '0px'
+        chatTypeBoxDiv.appendChild(attachImgToMessageButton);
+
+        const invisFileUploader = document.getElementById('upload-img-attachment');
+
+        const imgWrapper = document.createElement('div');
+        imgWrapper.id = 'stagingImgWrapper'
+        imgWrapper.style.position = 'relative';
+        imgWrapper.style.margin = '5px';
+        imgWrapper.style.display = 'none'
+
+        // Staging Image
+        const stagingImg = document.createElement('img');
+        stagingImg.id = 'stagingImg';
+        stagingImg.style.width = 'auto'; 
+        stagingImg.height = 250;
+        stagingImg.style.border = 'var(--stdBorder)';
+        stagingImg.style.boxShadow = 'var(--stdMinorShadow)';
+        stagingImg.style.display = 'block'; // prevents margin collapse with wrapper
+        imgWrapper.appendChild(stagingImg);
+
+        // Staging Img Remove Button
+        const removeStagingImgButton = document.createElement('button');
+        removeStagingImgButton.textContent = '×'; // optional label
+        removeStagingImgButton.style.position = 'absolute';
+        removeStagingImgButton.style.top = '5px';
+        removeStagingImgButton.style.left = '5px';
+        removeStagingImgButton.style.width = '20px';
+        removeStagingImgButton.style.height = '20px';
+        removeStagingImgButton.style.background = 'var(--navBarColor)';
+        removeStagingImgButton.style.border = 'var(--stdBorder)';
+        removeStagingImgButton.style.boxShadow = 'var(--stdMinorShadow)';
+        removeStagingImgButton.style.cursor = 'pointer';
+        removeStagingImgButton.style.zIndex = '10000'
+        imgWrapper.appendChild(removeStagingImgButton);
+
+        msgContentHolderDivOuter.appendChild(imgWrapper)
+        // Optional: Hook up the remove logic
+        removeStagingImgButton.addEventListener('click', () => {
+            imgWrapper.style.display = 'none'
+        });
+
+                    
+        attachImgToMessageButton.addEventListener('click', () => {
+            invisFileUploader.click();
+
+            invisFileUploader.addEventListener('change', () => {
+                const file = event.target.files[0];
+                
+                const validType = file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')  || file.name.toLowerCase().endsWith('.jpeg');
+                
+                
+                if (file && validType && file.size <= 1500000 /*1.5 MB or less*/) {
+                    imgWrapper.style.display = 'inline-block'
+                    stagingImg.src = URL.createObjectURL(file);
+                    //askServerToAttachImageToMessage(formData);
+                } else {
+                    alert('Invalid image, must be a GIF, PNG or JPEG and less than 1.5 MB in size.')
+                }   
+            });
+        });
+    }
+
+    chatTypeBoxDiv.appendChild(msgContentHolderDivOuter)
 
     {
         /*********************************************************/
@@ -530,7 +662,6 @@ function initMessageHolder() {
         threadMsgHolderOuter.appendChild(replyDiv);
     }
 
-
     let msgHolder = document.createElement('chat-message-holder');
     if (msgHolder == undefined) {
         msgHolder = document.createElement('div');
@@ -544,15 +675,14 @@ function initMessageHolder() {
     msgHolder.id = 'chat-message-holder'
     msgHolder.className = 'chat-message-holder';
     msgHolder.style.zIndex = '5'
+    msgHolder.style.marginLeft = '5px'
     msgHolder.style.backgroundColor = 'var(--navBarColor)';
 
     msgHolder.maxlength = MAX_MESSAGE_LENGTH;
 
-    chatTypeBoxDiv.appendChild(msgHolder);
+    msgContentHolderDivOuter.appendChild(msgHolder);
 
     const sendButton = document.getElementById("send-button");
-
-
 
     // event listeners
     msgHolder.addEventListener('keydown', (event) => {
@@ -579,13 +709,47 @@ function initMessageHolder() {
     })
 
     sendButton.addEventListener('click', () => {
-        if (msgHolder.innerText.length != 0) { // cannot send a blank message
+        console.log('file')
+
+        if (msgHolder.innerText.length != 0 || stagingImgWrapper.style.display != 'none') { // cannot send a blank message, unless it has an image
+
+            const stagingImgWrapper = document.getElementById('stagingImgWrapper');
+            
+            const invisFileUploader = document.getElementById('upload-img-attachment');
+
+            const stagingImgSrc = document.getElementById('stagingImg').src;
+
+            
             if (msgHolder.innerText.length > MAX_MESSAGE_LENGTH) {
                 msgHolder.innerText = msgHolder.innerText.slice(0, MAX_MESSAGE_LENGTH)
             } else {
-                sendMessage(msgHolder.innerText)
-                console.log('REPLY: ' , getReplyingTo())
-                msgHolder.innerText = '';
+
+                let imgData = null;
+                if (stagingImgWrapper.style.display != 'none') {
+                    const file = invisFileUploader.files[0];
+            
+                    if (file) {
+                        const formData = new FormData();
+                        formData.append('imgAttachment', file);  // Append the file to FormData (for server-side)
+            
+                        // Convert the image file to a Base64 string
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            imgData = event.target.result; // Base64 string of the image            
+                            sendMessage(msgHolder.innerText, imgData, stagingImgSrc);
+                            msgHolder.innerText = '';
+                        };
+
+                        // trigger the file reading process (to fire onload event)
+                        reader.readAsDataURL(file);
+                    }
+
+                    stagingImgWrapper.style.display = 'none';
+                } else {
+
+                    sendMessage(msgHolder.innerText, imgData)
+                    msgHolder.innerText = '';
+                }
             }
             setReplyingTo(null);
         }
@@ -598,8 +762,6 @@ function initMessageHolder() {
     msgRightClickDiv.id = 'message-right-click-box';
     msgRightClickDiv.className = 'message-right-click-box';
     threadMessagesHolder.appendChild(msgRightClickDiv);
-
-    console.log('scroll event added')
 
 
             
@@ -636,8 +798,18 @@ function initMessageHolder() {
     });
 }
 
-async function setCurrentThread(threadID, loadHTML = true, loadMessageChunks=true) {
+async function setCurrentThreadID(threadID, loadHTML = true, loadMessageChunks=true) {
+    
+    if (threadID == undefined) {
+        window.currentThreadID = undefined;
+        return;
+    }
 
+    threadID = Number(threadID);
+    if (window.user != undefined) {
+        removeUnreadPingsFromThread(window.currentChannel.id, threadID);
+    }
+    
     window.currentlyReplyingTo = null;
 
     window.lowestChunkIndex = null;
@@ -646,17 +818,20 @@ async function setCurrentThread(threadID, loadHTML = true, loadMessageChunks=tru
     let state = {channelId: window.currentChannel.id}; if (window.threadID !=undefined) {state.threadID = window.threadID};
     window.history.pushState(state, '', `/channels/${window.currentChannel.id}/${threadID}`);
 
-    if (window.currentThreadID) {
+    if (window.currentThreadID) { // remove previous event listeners
         socket.off(`#${window.currentThreadID}new-chat-message`);
+
+        socket.off(`#${threadID}delete-chat-message`, deleteChatMessageAtServerRequest);
     }
+
+
+    ////////////////////////////////////////////////////////////////////////
+
+    window.currentThreadID = threadID;
 
     socket.on(`#${threadID}new-chat-message`, recieveMessageFromServer)
 
     socket.on(`#${threadID}delete-chat-message`, deleteChatMessageAtServerRequest)
-
-    socket.on(`ping-recieve`, recievePingFromServer)
-
-    window.currentThreadID = threadID;
 
 
     for (const thread of window.currentChannel.threads) {
@@ -733,13 +908,19 @@ async function loadMsgChunk(chunkIndex, keepScrollPos = true) {
         const oldScrollHeight = messageUL.scrollHeight;
         const oldScrollTop = messageUL.scrollTop;
         
+        let imgURL = null;
+        if (message.hasImg == true) {
+            imgURL = `/msgImgAttachments/${window.currentChannel.id}/${getCurrentThreadID()}/${message.id}.${message.imgExt}`
+        }
+
         addMessageToMessageHolder
         (
             message.content, message.date,
             {id: message.ownerID, username: message.ownerUsername, hasProfilePicture: message.ownerHasProfilePicture},
             message.id,
             insertAtBeginning,
-            message.isReplyTo
+            message.isReplyTo,
+            imgURL
         );
         
         if (keepScrollPos) {

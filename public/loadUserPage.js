@@ -409,7 +409,7 @@ function loadUserPage(userInfo) {
                 formData.append('profilePicture', file);  // 'profilePicture' is the key the server will use to retrieve the file
                 askServerToUpdatePFP(formData);
             } else {
-                alert('Invalid image, must be a PNG or JPEG and less than 200 KB in size.')
+                alert('Invalid image, must be a PNG or JPEG and less than 300 KB in size.')
             }        
         });
 

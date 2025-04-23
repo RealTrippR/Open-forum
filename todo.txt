@@ -2,6 +2,7 @@
 [ ] Add protection against brute force attacks
 [ ] Fix bug: currently users can only view there profile pages
 [ ] Improve UI design?
-[ ] Implement thread and message searching
+[ ] Implement thread and message searchings
 [ ] Use JWT for sessions instead of a server side DB
 [ ] Optimize: Load messages in chunks
+[ ] Finish ping system and add a option to silence channels

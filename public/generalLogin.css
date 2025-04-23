@@ -1,0 +1,92 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: var(--backgroundColor);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+#navbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+}
+
+.login-box {
+    align-items: center;
+    background-color: var(--navBarColor);
+    padding: 50px;
+    box-shadow: var(--stdShadow);
+    width: 320px;
+    text-align: center;
+    border: var(--stdBorder);
+}
+.login-box form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.login-box h2 {
+    margin-bottom: 24px;
+}
+
+.login-box input[type="text"],
+.login-box input[type="email"],
+.login-box input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0 16px 0;
+    font-size: 14px;
+    font-family: var(--stdMinorFontFamily);
+}
+
+.login-box input[type="submit"] {
+    background: var(--navBarColor);
+
+    color: white;
+    border: var(--stdMinorShadow);
+    padding: 12px 20px;
+    font-size: 16px;
+    font-family: var(--stdMinorFontFamily);
+    cursor: pointer;
+    width: 100%;
+
+    text-decoration: none;
+    font-size: 14px;
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
+    
+}
+
+.login-box input[type="submit"]:hover {
+    background:  color-mix(in srgb, var(--backgroundColor) 70%, black);
+}
+
+.page-button {
+    font-family: var(--stdMinorFontFamily);
+    background-color: var(--navBarColor);
+    background: var(--navBarColor);
+    padding: 12px 20px;
+    margin: 0px 20px 0px 20px;
+    margin-top: 16px;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 14px;
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
+    display: inline-block;
+    cursor: pointer;;
+}
+
+.page-button:hover {
+    background-color:  color-mix(in srgb, var(--navBarColor) 80%, black);
+    background: color-mix(in srgb, var(--navBarColor) 80%, black);
+}
+
+.login-box a:hover {
+    background:  color-mix(in srgb, var(--backgroundColor) 70%, black);
+
+}

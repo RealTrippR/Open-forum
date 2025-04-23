@@ -25,21 +25,40 @@ async function init(_dbPool, _io) {
                 if (socket.request.user==undefined) {
                     return; // user is not logged in
                 }
-                if (req.message.length == 0) {
-                    return; // cannot send a blank message
+                if (req.message.length == 0 && (req.imgData==undefined || req.imgData == null)) {
+                    return; // cannot send a blank message, unless it has an image attached to it
                 }
+                
+                if (req.imgData == undefined || req.imgData == null) {
+                    req.imgData = null;
+                }
+
                 const privateUser = await dbUtils.getUserByUsername(dbPool, socket.request.user.username);
                 const reqUserID = privateUser.id;
-                await dbUtils.addMessageToThread(dbPool, req.channelID, req.threadID, reqUserID, req.message, req.isReplyTo);
+                
+                await dbUtils.addMessageToThread(dbPool, req.channelID, req.threadID, reqUserID, req.message, req.isReplyTo, req.imgData);
         
+                // if it has an image create it
+                
+
+
                 const publicUserInfo = await dbUtils.getPublicUserInfo(dbPool, reqUserID);
+
+                let imgExt = undefined;
+                if (req.imgData != null) {
+                    // Extract the image format from the data URI
+                    const match = req.imgData.match(/^data:image\/(png|jpg|jpeg|gif);base64,/);
+                    imgExt = match ? match[1] : 'png';  // Default to 'png' if not found
+                }
 
                 socket.broadcast.emit(`#${req.threadID}new-chat-message`, {
                     message: req.message,
                     userInfo: publicUserInfo,
                     isReplyTo: req.isReplyTo,
                     channelID: req.channelID,
-                    threadID: req.threadID
+                    threadID: req.threadID,
+                    hasImg: !(req.imgData == undefined),
+                    imgExt: imgExt
                 });
 
             } catch (err) {
@@ -71,13 +90,35 @@ async function init(_dbPool, _io) {
         });
 
 
-        socket.on('ping-user', (req) => {
-            const socketInfo = openSockets.find(s => s.username === req.targetUsername);
-            if (socketInfo) {
-                const targetSocket = io.sockets.sockets.get(socketInfo.socketID);
-                if (targetSocket) {
-                    targetSocket.emit(`ping-recieve`, { from: socket.request.user.username, channelID: req.channelID, threadID: req.threadID });
+        socket.on('ping-user', async (req) => {
+            try {
+                const socketInfo = openSockets.find(s => s.username === req.targetUsername);
+
+                const pingObj = {from: socket.request.user.username, channelID: req.channelID, threadID: req.threadID, messageID: req.messageID}
+                const targPrivUser = await dbUtils.getUserByUsername(dbPool,  req.targetUsername)
+                if (socketInfo) {
+                    if (socket.request.user == undefined) {
+                        return; // the user isn't logged in
+                    }
+                    const targetSocket = io.sockets.sockets.get(socketInfo.socketID);
+                    const tmp = await dbUtils.getThreadFromID(dbPool, req.channelID, req.threadID);
+                    const threadName = tmp.name;
+                    let messageSlice = req.messageSlice;
+                    messageSlice = messageSlice.slice(0,32);
+                    if (targetSocket) {
+                        if (req.isReplyTo == undefined) {
+                            req.isReplyTo == null;
+                        } 
+                        targetSocket.emit(`ping-recieve`, { from: socket.request.user.username, channelID: req.channelID, threadID: req.threadID, threadName: threadName, messageID: req.messageID, req: req.isReplyTo, messageSlice: req.messageSlice });
+                        dbUtils.addUnreadPingToUser(dbPool, targPrivUser.id, pingObj); // add it anyways in case they don't open it
+                    }
+                } else {
+                    // the user is not logged in, store in it in their unread pings
+                    dbUtils.addUnreadPingToUser(dbPool, targPrivUser.id, pingObj);
                 }
+            } catch (err) {
+                console.error("Error pinging user:", err);
+                //socket.emit('error', 'Failed to ping user.');
             }
         });
     });

@@ -33,7 +33,12 @@ async function setCurrentChannel(channel, loadHTML = true) {
 
     window.currentChannel = channel;
 
-    let state = {channelId: window.currentChannel.id}; if (window.threadID !=undefined) {state.threadID = window.threadID};
+    window.setCurrentThreadID(undefined);
+
+    let state = {channelId: window.currentChannel.id};
+    
+    if (window.threadID !=undefined) {state.threadID = window.threadID};
+
     window.history.pushState(state, '', `/channels/${channel.id}`);
 
     window.currentChannel.threads = await getThreadsFromServer(window.currentChannel.id);
@@ -79,21 +84,119 @@ function setCurrentChannelFromButton() {
     setCurrentChannel({id: Number(li.dataset.channelId), name: li.dataset.channelName, description: li.dataset.channelDescription});
 }
 
-function loadChannelBar() {
+async function loadChannelBar() {
+
+    let mutedChannelIDs = [];
+    if (window.user != undefined) {
+        mutedChannelIDs = await getMutedChannelsFromServer();
+        window.user.mutedChannelIDs = mutedChannelIDs;
+        console.log('muted channels: ', mutedChannelIDs)
+    }
     // https://www.geeksforgeeks.org/how-to-append-html-code-to-a-div-using-javascript/
     let channelBar = document.getElementById("channelBar");
-
-    let html = `<ul class="channelBarUL">`;
+    channelBar.innerHTML = ``
+    let html = `<ul class="channelBarUL" id = 'channelBarUL'>`;
     html+= "<li class = 'channelBarHeader' id = 'channelBarHeader'><p>CHANNELS</p></li>"
-    for (let channel of window.channels) {
-        html += `<li class='channelBarHandleButton' data-channel-id=${channel.id} data-channel-name="${channel.name}" data-channel-description="${channel.description}"">
-            <p>${channel.name}</p>
-        </li>`;
-    }
     html += `</ul>`;
+    //////////////////////////////
     // Update innerHTML once
     channelBar.innerHTML = html;
+    //////////////////////////////
+
+
+    //////////////////////////////
+    // insert the channel headers
+    const channelBarUL = document.getElementById('channelBarUL');
+    for (let channel of window.channels) {
+
+         const li = document.createElement('li');
+
+        li.className = 'channelBarHandleButton'
+        li.style.display = 'flex';
+        li.style.alignItems = 'center'; // vertically align
+        li.dataset.channelId=channel.id;
+        li.dataset.channelName=channel.name;
+        li.dataset.channelDescription=channel.description;
+        
+        const p = document.createElement('p');
+        p.style.flexGrow = '1'; // Let the text take available space and push the icon to the right
+        p.innerText = channel.name;
+
+        li.appendChild(p);
+
+        {
+            const notisEnabledImg = document.createElement('img');
+            notisEnabledImg.src = '/icons/notis.png';
+            notisEnabledImg.width = '20';
+            notisEnabledImg.height = '20';
+            notisEnabledImg.style.border = 'var(--stdBorder)';
+            notisEnabledImg.style.boxShadow = 'var(--stdMinorShadow)';
+            notisEnabledImg.style.margin = '5px'
+            notisEnabledImg.style.marginRight = '5px';
+            notisEnabledImg.style.cursor = 'pointer';
+
+            if (mutedChannelIDs.includes(channel.id)) {
+                // disable notifications
+                notisEnabledImg.src = '/icons/notisDisabled.png'
+                notisEnabledImg.style.boxShadow = 'var(--stdInsetMinorShadow),var(--stdMinorShadow)'
+                notisEnabledImg.style.objectPosition = '1px 1px'; // shift image content
+            }
+            li.appendChild(notisEnabledImg);
+            // notice click listener
+            notisEnabledImg.dataset.channelID = channel.id;
+            notisEnabledImg.addEventListener('click', (event)=>{
+                const trg = event.target;
+                event.stopPropagation();
+                if (trg.src.includes('/icons/notis.png')) {
+                    // disable notifications
+                    trg.src = '/icons/notisDisabled.png'
+                    trg.style.boxShadow = 'var(--stdInsetMinorShadow),var(--stdMinorShadow)'
+                    trg.style.objectPosition = '1px 1px'; // shift image content
+                    updateMutedChannel(channel.id, true);
+                    return;
+                } else {
+                    // enable notifications
+                    trg.src = '/icons/notis.png'
+                    trg.style.boxShadow = 'var(--stdMinorShadow)'
+                    trg.style.objectPosition = '0px'; // shift image content
+                    updateMutedChannel(channel.id, false);
+                    return;
+                }
+            }); 
+            
+
+            if (window.user != undefined) {
+
+                const unreadPingCountForThisChannel = (window.user.unreadPings.filter((ping) => (ping.channelID == channel.id))).length;
+
+                const notisCountDiv = document.createElement('div');
+                notisCountDiv.className = 'notisIconDiv';
+                notisCountDiv.style.width = '20px';
+                notisCountDiv.style.height = '20px';
+                notisCountDiv.style.right = '50px'
+                notisCountDiv.style.marginRight = '5px';
+                if (unreadPingCountForThisChannel==0) {
+                    notisCountDiv.style.display = 'none' // invisible
+                }
+
+                const notisCountP = document.createElement('p');
+                notisCountP.className = 'stdText';
+                notisCountP.textContent = `${unreadPingCountForThisChannel}`;
+                notisCountP.style.margin = 'auto';
+                notisCountP.style.color = 'var(--mainTextColor)'
+                notisCountP.style.fontSize = '15px'
+
+                notisCountDiv.appendChild(notisCountP);
+                li.appendChild(notisCountDiv);
+                
+            }
+        }
+
+        channelBarUL.appendChild(li);
+    }
+
     
+    //////////////////////////////
     let channelBarHandleButtons = channelBar.getElementsByClassName("channelBarHandleButton");
     for (let channelHandle of channelBarHandleButtons) {
         channelHandle.toggled = false;
@@ -114,6 +217,12 @@ function loadChannelBar() {
     channelNameHeader.style.marginLeft = `${document.getElementById('channelBarHeader').offsetWidth}px`;
     console.log(`${channelNameHeader.style.marginLeft}`);
 
+    
+    let channelInfoBarHolder = document.createElement('div');
+    channelInfoBarHolder.channelName = 'channelInfoBarHolder';
+    document.body.appendChild(channelInfoBarHolder);
+
+    
     async function reloadThreadsOnClick() {
         const li = event.currentTarget;
 
@@ -121,9 +230,4 @@ function loadChannelBar() {
         //console.log('Response from server:', threads);
         //loadThreads(threads); // causes duplication error for some reason
     }
-
-
-    let channelInfoBarHolder = document.createElement('div');
-    channelInfoBarHolder.channelName = 'channelInfoBarHolder';
-    document.body.appendChild(channelInfoBarHolder);
 }

@@ -37,19 +37,20 @@ initialize(
     passport
 );
 
-//await dbUtils.clearDB(dbPool, false, true, false);
+await dbUtils.clearDB(dbPool, false, true, false);
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
 
 const channels = await dbUtils.getChannels(dbPool);
-// await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread", "A thead for testing purposes", channels[1].id)
+const trgC = 0;
+await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread", "A thead for testing purposes", channels[trgC].id)
 
-//  for (let i = 0; i < process.env.MESSAGE_CHUNK_SIZE*5; i++) {
-//       await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `${i+1}  -+- THIS IS A MESSAGE -+- `)
-//  }
-//  await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `M1`)
-//  await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `M2`)
-//  await dbUtils.addMessageToThread(dbPool, channels[1].id, 1, 1, `M3`)
+ for (let i = 0; i < process.env.MESSAGE_CHUNK_SIZE*5; i++) {
+      await dbUtils.addMessageToThread(dbPool, channels[trgC].id, 1, 1, `${i+1}  -+- THIS IS A MESSAGE -+- `)
+ }
+ await dbUtils.addMessageToThread(dbPool, channels[trgC].id, 1, 1, `M1`)
+ await dbUtils.addMessageToThread(dbPool, channels[trgC].id, 1, 1, `M2`)
+ await dbUtils.addMessageToThread(dbPool, channels[trgC].id, 1, 1, `M3`)
 
 
 import router from '../Routers/router.js'

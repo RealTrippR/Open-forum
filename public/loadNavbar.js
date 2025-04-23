@@ -23,8 +23,8 @@ if (window.user && window.loggedIn) {
     HTML += `
     
         <li style="margin-left: auto; display: flex; gap: 15px;">
-            <a href="/notifications" style="display: flex; align-items: center; padding-left: 5px; padding-right: 1px;">
-                NOTIFICATIONS
+            <a href="https://zeus.vwu.edu/~rbrobins/" style="display: flex; align-items: center; padding-left: 5px; padding-right: 1px;">
+                HOMEPAGE
             </a>
         </li>
 

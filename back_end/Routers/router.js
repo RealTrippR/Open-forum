@@ -6,6 +6,9 @@ import dbUtils from '../Server/databaseUtils.js'
 import flash from 'express-flash'
 import session from 'express-session'
 import expressMysqlSession from 'express-mysql-session';
+import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 
 const MySQLStore = expressMysqlSession(session);
@@ -18,6 +21,7 @@ const PORT = process.env.SERVER_PORT;
 let passport;
 let dbPool;
 let io;
+  
 
 function isNumeric(str) {
     if (typeof str != "string") return false // we only process strings!  
@@ -94,6 +98,23 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
     app.use(middleWare);
     app.use(passport.initialize());
     app.use(passport.session());
+
+    /*********************************************************/
+    if (process.env.NODE_ENV != 'development') {
+        // stall brute force attacks
+        const limiter = rateLimit({
+            windowMs: 10 * 60 * 1000, // 10 minutes
+            max: 10, // Limit each IP to 10 requests per window
+            message: 'Too many requests, please try again later.',
+        });
+
+        app.use('/register', limiter);
+        app.use('/login', limiter);
+        app.use('/request-password-reset', limiter);
+        app.use('/reset-password', limiter);
+    }
+
+    
     /******************** */
     // forum homepage
     app.get('/', async (req, res) => {
@@ -105,6 +126,9 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             let currentUser = undefined;
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
+                const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username)
+                const unreadPings = await dbUtils.getUnreadPingsFromUser(dbPool, privUser.id);
+                currentUser.unreadPings = unreadPings;
             }
             res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated)})
           
@@ -128,27 +152,25 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
     })
 
     app.post('/login', (req, res, next) => {
+        
         passport.authenticate('local', (err, user, info) => {
-          if (err) return next(err);
-          if (!user) return res.redirect('/login');
-      
-          req.logIn(user, (err) => {
             if (err) return next(err);
-            return res.redirect('/');
-          });
+            //if (!user) return res.redirect(401, '/login');
+            if (!user) {return res.status(401).send() };
+
+            req.logIn(user, (err) => {
+                if (err) return next(err);
+                return res.redirect('/');
+            });
+            // if (err) return next(err);
+            // if (!user) return res.redirect('/login');
+        
+            // req.logIn(user, (err) => {
+            //     if (err) return next(err);
+            //     return res.redirect('/');
+            // });
         })(req, res, next);
-      });
-    app.post('/login', (req, res, next) => {
-        passport.authenticate('local', (err, user, info) => {
-          if (err) return next(err);
-          if (!user) return res.redirect('/login');
-      
-          req.logIn(user, (err) => {
-            if (err) return next(err);
-            return res.redirect('/');
-          });
-        })(req, res, next);
-      });
+    });
 
     app.get('/register', returnToHomepageIfAuthenticated, async (req, res)  =>  {
         const loggedIn = await req.isAuthenticated();
@@ -157,16 +179,18 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
 
     app.post('/register', returnToHomepageIfAuthenticated, async (req,res) => {
         try {
-            if (req.body.username.length <= process.env.USERNAME_MIN_LENGTH ||  req.body.password.length <= process.env.PASSWORD_MIN_LENGTH) {
-                return req.status(400).send();
+            if (req.body.username.length < process.env.USERNAME_MIN_LENGTH ||  req.body.password.length < process.env.PASSWORD_MIN_LENGTH) {
+                return res.status(400).send();
+            }
+            if (req.body.username.length > process.env.USERNAME_MAX_LENGTH) {
+                return res.status(400).send();
             }
             const registerRES = await dbUtils.registerUser(dbPool, req.body.email, req.body.username,  req.body.password);
             if (typeof(registerRES)==='string' || registerRES===undefined) { // register user will return a string if it fails
                 res.redirect('/login');
-                res.redirect('/login');
                 //res.pos // use socket to send error messages
             } else {
-                console.log("Registered user: ", registerRES);
+                //console.log("Registered user: ", registerRES);
                 res.redirect('/login');
             }
         } catch (err) {
@@ -229,9 +253,13 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
 
             const authenticated = await req.isAuthenticated();
 
+            
             let currentUser = undefined;
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
+                const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username)
+                const unreadPings = await dbUtils.getUnreadPingsFromUser(dbPool, privUser.id);
+                currentUser.unreadPings = unreadPings;
             }
             res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId})
           
@@ -256,6 +284,9 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             let currentUser = undefined;
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
+                const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username)
+                const unreadPings = await dbUtils.getUnreadPingsFromUser(dbPool, privUser.id);
+                currentUser.unreadPings = unreadPings;
             }
             res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId, loadThread: threadId})
           
@@ -278,6 +309,9 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             let currentUser = undefined;
             if ( authenticated && req.user != undefined) {
                 currentUser = req.user;
+                const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username)
+                const unreadPings = await dbUtils.getUnreadPingsFromUser(dbPool, privUser.id);
+                currentUser.unreadPings = unreadPings;
             }
             res.render('index.ejs', {messageChunkSize: process.env.MESSAGE_CHUNK_SIZE, channels: JSON.stringify(channels), user: JSON.stringify(currentUser), loggedIn: JSON.stringify(authenticated), loadChannel: channelId, loadThread: threadId, loadMessage: messageID})
           
@@ -286,6 +320,100 @@ async function init(app,_dbOptions, _dbPool, _passport, _io) {
             res.status(500).send();
         }
     });
+
+
+    /****************************************************/
+    // password reset system //
+    { 
+        // Email setup (email SMTP)
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            secure: true,
+            auth: {
+            user: "openforummessenger@gmail.com",  // gmail
+            pass: "tacqtcpcpccdhcng"   // password
+            }
+        });
+        
+        app.get('/request-password-reset', (req, res) => {
+            res.render('request-password-reset.ejs');
+        });
+        app.post('/request-password-reset', async (req, res) => {
+            try {
+                const { username, email} = req.body;
+                if (typeof(username) !== "string") {return res.status(400).send()};
+
+                const user = await dbUtils.getUserByUsername(dbPool, username);
+            
+                if (user==undefined) {return res.status(400).send()};
+                if (user.email != email) {return res.status(400).send()};
+                // Check if token was already used
+                // if (user.resetTokenUsed == true) {
+                //     return res.status(410).send('Password reset already done.');
+                // }
+            
+                // Generate reset token
+                const token = crypto.randomBytes(64).toString('hex');
+                const expiration = new Date(Date.now() + 15 * 60000); // Token expires in 15 mins
+
+                const tmpRes = await dbUtils.setUserPasswordResetToken(dbPool, user.id, token, expiration);
+                if (tmpRes == false) {
+                    return res.status(500).send();
+                }
+            
+                
+                const protocol = req.protocol; // 'http' or 'https'
+                const host = req.get('host');  // current domain
+
+                        // Send reset email
+                const resetLink = `${protocol}://${host}/reset-password?username=${username}&token=${token}`;
+                transporter.sendMail({
+                    to: user.email,
+                    subject: 'Password Reset',
+                    html: `
+                        <H2 style='color: black'> OPEN-FORUM </H2>
+                        <p style="color: red;">DO NOT SHARE THIS LINK WITH ANYONE. <BR> It will expire in 15 minutes.</p>
+                        <p style='color: black'>Click the link below to reset your password:</p>
+                        <a href="${resetLink}">${resetLink}</a>
+                        `
+                });
+            
+                return res.status(200).send()
+            } catch (err) {
+                console.error('Password reset request failure: ', err)
+                return res.status(500).send();
+            }
+        });
+
+                
+        app.get('/reset-password', (req, res) => {
+            res.render('reset-password.ejs');
+        });
+        app.post('/reset-password', async(req, res) => {
+            try {
+                const { username, token, newPassword } = req.body;
+                const user = await dbUtils.getUserByUsername(dbPool, username);
+                
+                if (user == undefined) { return res.status(400).send('Invalid username'); }
+                if (newPassword == undefined) { return res.status(400).send('Invalid password'); }
+                // Validate token
+                if (user.resetToken !== token || user.resetTokenExpiration < Date.now()) {
+                    return res.status(401).send('Invalid token');
+                }
+            
+                let tmpRes = await dbUtils.resetUserPasswordResetToken(dbPool, user.id);
+                if (tmpRes == false) {return res.status(500).send();}
+                tmpRes = await dbUtils.updateUserPassword(dbPool, user.id, newPassword);
+                if (tmpRes == false) {return res.status(500).send();}
+            
+                return res.status(200).send();
+            } catch (err) {
+                console.error('Password reset failure: ', err)
+                return res.status(500).send();
+            }
+        });
+    }
+    
 }
 
 function returnToHomepageIfAuthenticated (req,res,next) {

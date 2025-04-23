@@ -4,96 +4,11 @@
     <meta charset="UTF-8">
     <title>OpenForum - Login</title>
     <link rel="stylesheet" href="/style.css">
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: var(--backgroundColor);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-
-        #navbar {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-        }
-
-        .login-box {
-            align-items: center;
-            background-color: var(--navBarColor);
-            padding: 50px;
-            box-shadow: var(--stdShadow);
-            width: 320px;
-            text-align: center;
-            border: var(--stdBorder);
-        }
-        .login-box form {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .login-box h2 {
-            margin-bottom: 24px;
-        }
-
-        .login-box input[type="text"],
-        .login-box input[type="password"] {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0 16px 0;
-            font-size: 14px;
-            font-family: var(--stdMinorFontFamily);
-        }
-
-        .login-box input[type="submit"] {
-            background: var(--navBarColor);
-
-            color: white;
-            border: var(--stdMinorShadow);
-            padding: 12px 20px;
-            font-size: 16px;
-            font-family: var(--stdMinorFontFamily);
-            cursor: pointer;
-            width: 100%;
-
-            text-decoration: none;
-            font-size: 14px;
-            border: var(--stdBorder);
-            box-shadow: var(--stdMinorShadow);
-            
-        }
-
-        .login-box input[type="submit"]:hover {
-            background:  color-mix(in srgb, var(--backgroundColor) 70%, black);
-        }
-
-        .login-box a {
-            font-family: var(--stdMinorFontFamily);
-
-            background: (--navBarColor);
-            padding: 12px 20px;
-            margin: 0px 20px 0px 20px;
-            display: block;
-            margin-top: 16px;
-            color: #ffffff;
-            text-decoration: none;
-            font-size: 14px;
-            border: var(--stdBorder);
-            box-shadow: var(--stdMinorShadow);
-        }
-
-        .login-box a:hover {
-            background:  color-mix(in srgb, var(--backgroundColor) 70%, black);
-
-        }
-    </style>
+    <link rel="stylesheet" href="/generalLogin.css">
 </head>
 <body>
     <div id="navbar"></div>
+    <div id="copyright-div"> </div>
     <script src="/loadNavbar.js"></script>
     <script src="/loadCopyright.js"></script>
 
@@ -104,16 +19,49 @@
         };
     </script>
 
-    <div class="login-box">
-        <p class='stdText' style='font-family: var(--stdHeaderFontFamily); font-size: 30px; font-weight: 600; text-shadow: var(--stdShadow); '>Login to OpenForum</p>
-        <BR>
-        <form method="post">
-            <input type="text" name="username" placeholder="Username" required><br>
-            <input type="password" name="password" placeholder="Password" required><br>
-            <input type="submit" value="Login">
-        </form>
-        <a href="/register">New? Register An Account</a>
-    </div>
+<div class="login-box">
+    <p class='stdText' style='font-family: var(--stdHeaderFontFamily); font-size: 30px; font-weight: 600; text-shadow: var(--stdShadow); margin-bottom: -3px;'>Login to OpenForum</p>
+    <br>
+    <div class="errorText" id="error-msg" style="height: 12px"> </div>
+
+    <form id="login-form" >
+      <input type="text" name="username" id="username" placeholder="Username" required><br>
+      <input type="password" name="password" id="password" placeholder="Password" required><br>
+      <input type="submit" value="Login">
+    </form>
+  
+    <p id="error-msg" style="color: red; display: none;"></p>
+  
+    <a class='page-button' href="/register">New? Register An Account</a>
+    <a class='stdText' style="display: inline-block; margin-top: 5px; margin-bottom: -5px;" href="/request-password-reset">Forgot Password?</a>
+  </div>
+  
+<script>
+    document.getElementById('login-form').addEventListener('submit', async function (e) {
+        e.preventDefault(); // Stop form submission
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorMsg = document.getElementById('error-msg');
+
+
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password })
+        });
+
+
+        if (res.ok) {
+            window.location.href = '/';
+        } else {
+            console.log()
+            // Login failed — show error message
+            //errorMsg.style.display = 'block';
+            errorMsg.textContent = 'Incorrect Username or Password';
+        }
+    });
+</script>
 
     <div id="copyright-div"> </div>
 

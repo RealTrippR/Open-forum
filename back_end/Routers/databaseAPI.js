@@ -111,6 +111,65 @@ async function init(app, _dbPool) {
         }
     });
 
+    app.post('/api-username-taken', async(req,res) => {
+        try {
+            if (req.body == undefined || req.body.username == undefined) {
+                return req.status(400).send()
+            }
+            const username = req.body.username;
+            const isTaken = await dbUtils.isUsernameTaken(dbPool, username);
+            if (isTaken==true) {
+                return res.status(409).send(); // 409: conflict code
+            } else {
+                return res.status(200).send();
+            }
+        } catch (err) {
+            console.error("API FAIL: ", err);
+            res.status(500).send();
+        }
+    });
+
+    app.post('/api-update-user-muted-channel', async(req, res) => {
+        if (!req.isAuthenticated()) {
+            return req.status(401).send();
+        }
+        try {
+            // channelid
+            const updateinfo  = req.body;
+            if (updateinfo == null || updateinfo == undefined) {
+                res.status(400).send();
+            }
+            if (updateinfo.channelID == undefined) {
+                res.status(400).send();
+            }
+
+            const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = user.id;
+
+            await dbUtils.updateUserMutedChannel(dbPool, updateinfo.channelID, userID, updateinfo.muted);
+            res.status(200).send();
+        } catch (err) {
+            console.error(err);
+            res.status(500).send();
+        }
+    });
+
+    app.post('/api-get-user-muted-channels', async(req, res) => {
+        if (!req.isAuthenticated()) {
+            return req.status(401).send();
+        }
+        try {
+            const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = user.id;
+
+            const mutedChannels = await dbUtils.getUserMutedChannels(dbPool, userID);
+            res.status(200).json({mutedChannels: mutedChannels}).send();
+        } catch (err) {
+            console.error(err);
+            res.status(500).send();
+        }
+    });
+
     app.post('/api-update-user-description', async(req, res) => {
         if (!req.isAuthenticated()) {
             return req.status(401).send();
@@ -119,7 +178,7 @@ async function init(app, _dbPool) {
             // description
             const  updateinfo  = req.body;
             if (updateinfo == null) {
-                throw new Error("Thread info undefined!");
+                throw new Error("Update info undefined!");
             }
 
             const newDesc = updateinfo.description;
@@ -223,6 +282,7 @@ async function init(app, _dbPool) {
                     
                     const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
                     const userID = user.id;
+                    // make sure that the user actually owns the thread before deleting it
                     if (th.ownerID != userID) {
                         return res.status(401).send();
                     }
@@ -251,7 +311,7 @@ async function init(app, _dbPool) {
             const form = formidable({
                 uploadDir: path.join(__dirname, '../../public/profile-pictures'), // folder to save uploaded files
                 keepExtensions: true,
-                maxFileSize: 200000, // 200 KB limit
+                maxFileSize: 300000, // 300 KB limit
                 multiples: false,
             });
             
@@ -313,6 +373,67 @@ async function init(app, _dbPool) {
             dbUtils.giveUserProfilePicture(dbPool, userID);
         } catch (err) {
             console.error("Failed to change profile picture: ", err);
+            res.status(500).send();
+        }
+    });
+
+    app.post('/api-get-unread-pings',  async(req,res) => {
+        try {
+            if (req.isAuthenticated() == false) {
+                return res.status(401).send();
+            }
+            const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = privUser.id;
+            const unreadPings = await dbUtils.getUnreadPingsFromUser(dbPool, userID);
+            return res.status(200).json({unreadPings: unreadPings}).send();
+        } catch (err) {
+            console.error('Failed to get unread pings: ', err);
+            res.status(500).send();
+        }
+    });
+
+    // expects a ping obj in the request body
+    app.post('/api-add-unread-ping',  async(req,res) => {
+        try {
+            if (req.isAuthenticated() == false) {
+                return res.status(401).send();
+            }
+            const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = privUser.id;
+
+            const body = req.body;
+            if (body.pingObj == undefined) {
+                return res.status(400).send();
+            }
+            const pingObj = body.pingObj;
+            await dbUtils.addUnreadPingToUser(dbPool, userID, pingObj);
+            res.status(200).send();
+        } catch (err) {
+            console.error('Failed to add unread ping: ', err);
+            res.status(500).send();
+        }
+    });
+
+    //removeUnreadPingsOfUserFromThread
+    app.post('/api-remove-unread-pings-of-user-from-thread', async(req,res) => {
+        try {
+            if (req.isAuthenticated() == false) {
+                return res.status(401).send();
+            }
+            const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = privUser.id;
+
+            const body = req.body;
+            const channelID = Number(body.channelID);
+            const threadID = Number(body.threadID);
+            if (channelID == undefined || threadID == undefined) {
+                return res.status(400).send();
+            }
+
+            await dbUtils.removeUnreadPingsOfUserFromThread(dbPool, userID, channelID, threadID)
+            res.status(200).send();
+        } catch (err) {
+            console.error('Failed to remove unread pings', err);
             res.status(500).send();
         }
     });

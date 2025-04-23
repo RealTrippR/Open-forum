@@ -30,10 +30,10 @@
         1.8px 1.8px 0px rgba(0, 0, 0, 1);
 
     --stdInsetMinorShadow: 
-        inset .3px .3px 0px rgba(0, 0, 0, 1),
-        inset .6px .6px 0px rgba(0, 0, 0, 1),  
-        inset .9px .9px 0px rgba(0, 0, 0, 1),
-        inset 1.2px 1.2px 0px rgba(0, 0, 0, 1);
+        inset .3px .3px 0px rgba(50, 50, 50, 1),
+        inset .6px .6px 0px rgba(50, 50, 50, 1),  
+        inset .9px .9px 0px rgba(50, 50, 50, 1),
+        inset 1.2px 1.2px 0px rgba(50, 50, 50, 1);
     }
 
 body {
@@ -133,11 +133,10 @@ li.channelBarHandleButton {
     background-color: var(--backgroundColor);
 }
 
-/* 
+
 li.channelBarHandleButton:hover {
-    box-shadow: var(--stdInsetMinorShadow);
-    background-color: var(--navBarColor);
-} */
+    cursor: pointer;
+} 
 
 
 li.channelBarHandleButton p {
@@ -189,6 +188,23 @@ div.channelNameHeader {
     display: flex;
     vertical-align: middle;
 }
+
+/*--------------------------------------------*/
+/*NOTIFICATIONS*/
+
+.notisIconDiv {
+    background-color: var(--stdRed);
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
+}
+
+
+.notisIconDiv:hover {
+    cursor: pointer;
+    background-color: color-mix(in srgb, var(--stdRed) 90%, black);
+}
+
+
 
 /*--------------------------------------------*/
 /*THREAD HEADERS*/
@@ -360,6 +376,7 @@ div.chatTypeDiv {
     height: calc(var(--chatTypeBoxHeight) - 6px);
     margin: 3px;
     right: 0px;
+    bottom: 0px;
     min-width: 100px;
     box-shadow: var(--stdMinorShadow);
     background-color: var(--navBarColor);
@@ -463,6 +480,7 @@ div.chatTypeDiv {
 
 .errorText {
     bottom: 4px;
+    margin-top: -9px;
     color: rgb(224, 26, 26);
     position: relative;
     font-size: 10px;
@@ -471,4 +489,9 @@ div.chatTypeDiv {
     text-decoration: none;
     text-align: center;
     text-shadow: var(--stdMinorShadow);
+}
+
+/* Add this to your CSS */
+.placeholder::placeholder {
+    color: var(--mainTextColor) 
 }
