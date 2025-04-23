@@ -627,9 +627,9 @@ async function deleteThread(dbPool, channelID, threadID) {
         const deleteThreadQuery = `DELETE FROM ${threadTableName} WHERE id = ?`;
         await dbPool.query(deleteThreadQuery, [threadID]);
 
-        // create msg attachment folder for this channel
+        // delete msg attachment folder for this channel
         const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`,`${newThreadID}`);
-        fs.mkdirSync(msgAttachDir);
+        fs.rmdirSync(msgAttachDir);
 
     } catch (err) {
         console.error("Failed to delete thread: ", err);
@@ -946,10 +946,16 @@ async function deleteMessageFromThread(dbPool, channelID, threadID, messageID, o
         if (rows == undefined || rows.length > 1 || rows.length == 0) {
             throw new Error("Failed to delete message!");
         }
+        const msg = rows[0];
         // the user owns the message, proceed with deletion
-        if (rows[0].ownerID == ownerID) { 
+        if (msg.ownerID == ownerID) { 
             const query = `DELETE FROM ${messageTable} WHERE id = ?`;
             await dbPool.query(query, [messageID]);
+        }
+
+        if (msg.hasImg == true) {
+            const filePath = path.join('public/msgImgAttachments', `${channelID}`, `${threadID}`, `${msg.id}.${msg.imgExt}`); // Save in the 'uploads' folder
+            fs.unlink(filePath);
         }
 
         updateLastActive(dbPool, ownerID);

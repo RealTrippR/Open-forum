@@ -29,19 +29,23 @@ function setReplyingTo(msgElement) {
         let elemText = "";
 
         // Include direct text inside the span (not children) to combine mentions and the actual msg content into 1 string
-        for (let node of msgElement.children[3].childNodes) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            elemText += node.textContent;
-          } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN") {
-            elemText += node.innerText;
-          }
+        for (let node of msgElement.querySelectorAll('.msg-text')) {
+            if (!node.classList.contains('msg-text')) continue;  // only include direct children
+            
+            for (let child of node.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    elemText += child.textContent;
+                } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName === "SPAN" && child.className == 'stdText') {
+                    elemText += child.innerText;
+                }
+            }
         }
       
         //return combinedText;
         if (elemText.length > 20) {
             elemText = elemText.slice(0,20) + `...`
         }
-        replyMsgDiv.children[1].innerText = `Replying To: ${msgElement.children[1].innerHTML}` + `  | ` + `${elemText}`
+        replyMsgDiv.children[1].innerText = `Replying To: ${msgElement.querySelector('.msg-username').innerHTML}` + `  | ` + `${elemText}`
     }
 }
 
@@ -175,6 +179,12 @@ function sendMessage(message, imgData = null, imgURL = null) {
 
 
     addMessageToMessageHolder(message, datetime, window.user, lastID+1, false, getReplyingTo(), imgURL);
+
+    const messageUL = document.getElementById('message-UL');
+    
+    const msgHolder = document.getElementById('chat-message-holder');
+
+    messageUL.style.marginTop = `-${0}px`
 }
 
 function deleteMessage(messageID, messageElement /*optional*/) {
@@ -209,6 +219,9 @@ function recieveMessageFromServer(req) {
     }
 
     let imgURL = null;
+    if (req.hasImg == true) {
+        imgURL = `/msgImgAttachments/${window.currentChannel.id}/${getCurrentThreadID()}/${lastID+1}.${req.imgExt}`
+    }
     addMessageToMessageHolder(req.message, datetime, req.userInfo, lastID+1, false, req.isReplyTo, imgURL);
 }
 
@@ -358,7 +371,6 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
 
         let img = undefined;
         if (imgURL != null) {
-            console.log('img url: ', imgURL) 
 
             // Staging Image
             img = document.createElement('img');
@@ -368,6 +380,8 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
             img.style.boxShadow = 'var(--stdMinorShadow)';
             img.style.display = 'block'; // prevents margin collapse with wrapper
             img.src = imgURL;
+            img.style.display = 'block';
+            img.style.maxWidth = '600px'; 
         }
 
         li.appendChild(profileDiv);
@@ -555,11 +569,13 @@ function initMessageHolder() {
         attachImgToMessageButton.style.marginLeft = '3px';
         attachImgToMessageButton.style.width = '34px';
         attachImgToMessageButton.style.height = '34px';
+        attachImgToMessageButton.style.padding = '0';
         attachImgToMessageButton.style.background = 'var(--navBarColor)'
         attachImgToMessageButton.style.border = 'var(--stdBorder)';
         attachImgToMessageButton.style.boxShadow = 'var(--stdMinorShadow)';
         attachImgToMessageButton.style.cursor = 'pointer';
         attachImgToMessageButton.style.bottom = '0px'
+        attachImgToMessageButton.innerHTML += `<img width=28 height=28 src="/icons/photo.png">`
         chatTypeBoxDiv.appendChild(attachImgToMessageButton);
 
         const invisFileUploader = document.getElementById('upload-img-attachment');
@@ -575,6 +591,7 @@ function initMessageHolder() {
         stagingImg.id = 'stagingImg';
         stagingImg.style.width = 'auto'; 
         stagingImg.height = 250;
+        stagingImg.style.maxWidth = '600px'; 
         stagingImg.style.border = 'var(--stdBorder)';
         stagingImg.style.boxShadow = 'var(--stdMinorShadow)';
         stagingImg.style.display = 'block'; // prevents margin collapse with wrapper
@@ -687,7 +704,7 @@ function initMessageHolder() {
     // event listeners
     msgHolder.addEventListener('keydown', (event) => {
         const messageUL = document.getElementById('message-UL');
-        messageUL.style.marginTop = `-${msgHolder.clientHeight-40}px`
+        messageUL.style.marginTop = `-${msgHolder.clientHeight-35}px`
         if (msgHolder.innerText.length > MAX_MESSAGE_LENGTH) {
             msgHolder.innerText = msgHolder.innerText.slice(0, MAX_MESSAGE_LENGTH);
         } else {

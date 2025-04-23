@@ -51,21 +51,21 @@ async function setCurrentChannel(channel, loadHTML = true) {
             break;
         } 
     }
-
-    {
-        // initialize the name bar
-        let channelNameHeader = document.getElementById('channelNameHeader');
-        channelNameHeader.style.height = `${document.getElementById('channelBarHeader').offsetHeight - 1}px`;
-        let HTML = `<p class='stdText' style='font-weight: 600; font-size: 23px; margin: auto 0px; padding-left: 5px; text-align: left; '>${window.currentChannel.name}</p>`;
-        HTML += `<p class='stdText' style='margin: auto 0px; font-size: 17px; padding-left: 15px; text-align: left;'> ${channel.description}</p>`
-        //HTML += `<button style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="button" name="createThread"> Create Thread </button>`
-        //HTML += `<input style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="text" placeholder="Search Threads"></input>`
-        channelNameHeader.innerHTML = HTML;
-        
-    }
     
     if (loadHTML) {
 
+        {
+            // initialize the name bar
+            let channelNameHeader = document.getElementById('channelNameHeader');
+            channelNameHeader.style.height = `${document.getElementById('channelBarHeader').offsetHeight - 1}px`;
+            let HTML = `<p class='stdText' style='font-weight: 600; font-size: 23px; margin: auto 0px; padding-left: 5px; text-align: left; '>${window.currentChannel.name}</p>`;
+            HTML += `<p class='stdText' style='margin: auto 0px; font-size: 17px; padding-left: 15px; text-align: left;'> ${channel.description}</p>`
+            //HTML += `<button style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="button" name="createThread"> Create Thread </button>`
+            //HTML += `<input style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="text" placeholder="Search Threads"></input>`
+            channelNameHeader.innerHTML = HTML;
+            
+        }
+        
         await loadThreads(window.currentChannel.threads);
 
         const msgChatBox = document.getElementById('chatTypeDiv')

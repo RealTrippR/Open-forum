@@ -260,7 +260,6 @@ div.channelNameHeader {
     overflow-y: auto;
     list-style: none;
     margin: 0;
-    margin-top: 5px;
 
     margin-left: 10px;
     padding: 0px;
@@ -367,6 +366,10 @@ div.chatTypeDiv {
     padding: 5px;
     box-sizing: border-box; /* Ensures padding/border stays within 100% height */
     margin-right: 105px;
+
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 
 .send-button {
