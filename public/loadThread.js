@@ -5,6 +5,14 @@ function stringToBool(str) {
     return String(str).toLowerCase() === "true";
 }
 
+function clearMsgUL() {
+    const msgUL = document.getElementById('message-UL');
+    for (let child of msgUL.children) {
+        if (child.dataset.messageID != undefined) {
+            child.remove(); // only delete messages
+        }
+    }
+}
 
 function setReplyingTo(msgElement) {
     window.currentlyReplyingTo = msgElement;
@@ -145,6 +153,7 @@ async function getThreadMessagesFromServer(channelID, threadID) {
 }
 
 function sendMessage(message, imgData = null, imgURL = null) {
+    message = message.replace(/\n+$/, ''); // get rid of any trailing newlines
 
     const msgUL = document.getElementById('message-UL');
     const lastElem = msgUL.children[msgUL.children.length-1];
@@ -507,10 +516,7 @@ async function loadThreadFromID(threadID,loadFirstTwoChunks=true) {
 
     window.loadedChunkIndices = [];
 
-    const msgUL = document.getElementById('message-UL');
-    while (msgUL.firstChild) { // clear all messages
-        msgUL.removeChild(msgUL.firstChild);
-    }
+    clearMsgUL();
       
     window.currentThreadID = threadID;
 
@@ -541,10 +547,12 @@ function initMessageHolder() {
     });
 
 
+   
     const chatTypeBoxDiv = document.createElement('div');
     chatTypeBoxDiv.id = 'chatTypeDiv';
     chatTypeBoxDiv.className = 'chatTypeDiv'
     chatTypeBoxDiv.style.display = 'none';
+        
     document.body.appendChild(chatTypeBoxDiv);
 
     chatTypeBoxDiv.style.alignItems = 'stretch';
@@ -774,16 +782,32 @@ function initMessageHolder() {
 
     
     const threadMessagesHolder = document.getElementById('threadMessagesHolder'); // the main div that holds the open thread
+                
+    const messageUL = document.getElementById('message-UL');
+    messageUL.dataset.isLoading = false;
+
     // create message right click box
     const msgRightClickDiv = document.createElement('div');
     msgRightClickDiv.id = 'message-right-click-box';
     msgRightClickDiv.className = 'message-right-click-box';
-    threadMessagesHolder.appendChild(msgRightClickDiv);
+    messageUL.appendChild(msgRightClickDiv);
 
+        
+    let lastscrolltop = messageUL.scrollTop;
+    function syncScroll() {
+          // Calculate the difference in scroll position
+    const scrollDifference =lastscrolltop -  messageUL.scrollTop;
 
-            
-    const messageUL = document.getElementById('message-UL');
-    messageUL.dataset.isLoading = false;
+    // Move the right-click div in the opposite direction of the scroll
+    msgRightClickDiv.style.top = `${parseInt(msgRightClickDiv.style.top || 0) + scrollDifference}px`;
+        lastscrolltop=messageUL.scrollTop;
+        // Continuously call syncScroll for the next frame
+        requestAnimationFrame(syncScroll);
+    }
+    
+    // Start the sync on the next available frame
+    requestAnimationFrame(syncScroll);
+
 
     console.log('scrollHeight:', messageUL.scrollHeight);
 
@@ -807,7 +831,6 @@ function initMessageHolder() {
         if (Math.abs(messageUL.scrollHeight - messageUL.scrollTop - messageUL.clientHeight) <= 1) {
             messageUL.dataset.isLoading = true;
 
-            console.log(window.lowestChunkIndex)
             await loadMsgChunk(window.lowestChunkIndex - 1, false)
             await loadMsgChunk(window.lowestChunkIndex - 1, false);
             messageUL.dataset.isLoading = false;
@@ -958,9 +981,10 @@ async function goToMessage(messageID) {
         const msgUL = document.getElementById('message-UL')
         msgUL.dataset.isLoading = true;
         // unfortunately as a result of the way that this app works you can't just skip to a chunk, so it's faster to just delete them all
-        while (msgUL.firstChild) { // clear all messages
-            msgUL.removeChild(msgUL.firstChild);
-        }
+        clearMsgUL()
+        // while (msgUL.firstChild) { // clear all messages
+        //     msgUL.removeChild(msgUL.firstChild);
+        // }
 
 
         window.lowestChunkIndex = null;

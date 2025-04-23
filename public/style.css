@@ -56,12 +56,6 @@ body {
     display: flex; /* makes it horizontal */
     width: 100%;
     border-bottom: 2px solid black;
-
-}
-
-.navbarUL li {
-    display: inline;
-    padding: 0px;
 }
 
 
@@ -338,7 +332,7 @@ div.channelNameHeader {
 /*--------------------------------------------*/
 /*CHAT BOX*/
 div.chatTypeDiv {
-    z-index: 2;
+    z-index: 15;
     position: fixed;
     min-height: var(--chatTypeBoxHeight);
     height: auto;
@@ -347,8 +341,9 @@ div.chatTypeDiv {
     background-color: var(--navBarColor);
     border: var(--stdBorder);
     box-shadow: var(--stdMinorShadow);
-    bottom: 0;
     margin: 30px;
+
+    bottom: 0;
     display: flex; /* flex layout */
 }
 
@@ -403,7 +398,7 @@ div.chatTypeDiv {
     box-shadow: var(--stdMinorShadow);
     padding: 0px;
     margin: 0px;
-    z-index: 1000; /* Ensure it appears above other elements */
+    z-index: 5; /* Ensure it appears above other elements */
     display: none;
 }
 
