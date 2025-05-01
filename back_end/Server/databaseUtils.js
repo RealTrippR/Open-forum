@@ -1,3 +1,5 @@
+import '../../env.js'
+
 import bcrypt, { hash } from 'bcrypt'
 import mysql from 'mysql2'
 import fs from 'fs'
@@ -53,10 +55,11 @@ async function initDB(dbPool) {
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(32) NOT NULL,
             description VARCHAR(64) NOT NULL DEFAULT "",
-            threadListId INT NOT NULL
+            threadListId INT NOT NULL,
+            pinnedThreadId INT DEFAULT NULL
         );`;
         await dbPool.query(CHANNELcreateTableQuery);
-      
+    
         const SESSIONcreateTableQuery =
         `CREATE TABLE IF NOT EXISTS sessions (
             session_id varchar(128) COLLATE utf8mb4_bin NOT NULL,
@@ -265,7 +268,8 @@ async function createThreadTableForChannel(dbPool, channelID) {
         name VARCHAR(64),
         description VARCHAR(128) NOT NULL DEFAULT "",
         lastModified DATETIME,
-        creationDate DATETIME
+        creationDate DATETIME,
+        lockedToAdmins TINYINT(1) DEFAULT 0
     )
     `;
     await dbPool.query(createTableQuery);
@@ -299,7 +303,18 @@ function getThreadTableNameFromChannelID(channelID) {
     return process.env.MYSQL_THREAD_TABLE + String(channelID);
 }
 
-async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescription, channelID) {
+// to unpin a channel just pass null as the channel index
+async function setPinnedThreadOfChannel(dbPool, channelID, threadID) {
+    try {
+        const query = `UPDATE ${process.env.MYSQL_CHANNEL_TABLE} SET pinnedThreadId = ? WHERE id = ?`
+        await dbPool.query(query, [threadID, channelID]);
+    } catch (err) {
+        console.error('Failed to set pinned thread of channel: ', err);
+        return false;
+    }
+}
+
+async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescription, channelID, adminEditOnly = false) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
     }
@@ -308,12 +323,14 @@ async function addThreadToChannel(dbPool, threadOwnerID, threadName, threadDescr
     }
 
     const tableName = getThreadTableNameFromChannelID(channelID);(channelID);
-    const addThreadQuery = `INSERT INTO ${tableName} (ownerID, name, description, creationDate) VALUES (?, ?, ?, ?)`;
+    const addThreadQuery = `INSERT INTO ${tableName} (ownerID, name, description, creationDate, lockedToAdmins) VALUES (?, ?, ?, ?, ?)`;
 
     const now = new Date();
     const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
     
-    const [result] = await dbPool.query(addThreadQuery, [threadOwnerID, threadName, threadDescription, datetime]);
+    let lockedToAdmins;
+    if (adminEditOnly==true) {lockedToAdmins = 1} else {lockedToAdmins = 0}
+    const [result] = await dbPool.query(addThreadQuery, [threadOwnerID, threadName, threadDescription, datetime, lockedToAdmins]);
     const newThreadID = result.insertId;
     await createMessageTableForThread(dbPool, channelID, newThreadID);
     
@@ -340,7 +357,7 @@ async function getChannels(dbPool) {
     }
 }
 
-const validateEmail = (email) => {
+function validateEmail (email) {
     return String(email)
       .toLowerCase()
       .match(
@@ -348,6 +365,7 @@ const validateEmail = (email) => {
       );
   };
   
+// returns either true or false
 async function isEmailInUse(dbPool, email) {
     if (dbPool === undefined) {
         throw new Error('dbPool is required as an argument');
@@ -355,8 +373,8 @@ async function isEmailInUse(dbPool, email) {
 
     try {
         const query = `SELECT * FROM ${process.env.MYSQL_USER_TABLE} WHERE email = ?`
-        const {res} = await dbPool.query(query, [email]);
-        if (res.length>=0) {
+        const [res]= await dbPool.query(query, [email]);
+        if (res.length>0) {
             return true;
         }
         if (res.length>1) {
@@ -628,7 +646,7 @@ async function deleteThread(dbPool, channelID, threadID) {
         await dbPool.query(deleteThreadQuery, [threadID]);
 
         // delete msg attachment folder for this channel
-        const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`,`${newThreadID}`);
+        const msgAttachDir = path.join('public/msgImgAttachments',`${channelID}`,`${threadID}`);
         fs.rmdirSync(msgAttachDir);
 
     } catch (err) {
@@ -646,9 +664,49 @@ async function getDescriptionFromChannel(dbPool, channelID) {
     return rows[0].description;
 }
 
+async function setUserAdminState(dbPool, userID, adminState /*true or false*/) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
+    try {
+        if (typeof(userID) != "number") {throw new Error('userID is required as an argument, and it must be a number');};
+        if (typeof(adminState) != "boolean") {throw new Error('adminState is required as an argument, and it must be a boolean');};
+
+
+        const updateAdminQuery = `UPDATE ${process.env.MYSQL_USER_TABLE} SET isAdmin = ? WHERE id = ?`
+        await dbPool.query(updateAdminQuery, [Number(adminState), userID]);
+
+        const user = await getUserFromID(dbPool, userID);
+        const username = user.username;
+        if (adminState) {
+            console.log(`Succesfully gave user ${username} admin privileges`)
+        } else {
+            console.log(`Succesfully revoked the admin privileges of user ${username}`)
+        }
+    } catch (err) {
+        console.error("Failed to get set admin state: ", err);
+        return false;
+    }
+}
+async function isUserAdmin(dbPool, userID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
+    try {
+        if (typeof(userID) != "number") {throw new Error('userID is required as an argument');};
+
+        const privUser = await getUserFromID(dbPool, userID);
+        if (privUser.isAdmin != undefined) {
+            if (privUser.isAdmin == true) {
+                return true;
+            }
+        }
+        return false;
+    } catch (err) {
+        console.log("Failed to get user admin state: ", err);
+        return false;
+    }
+}
+
 // returns a user struct without any sensitive information (i.e. no passwords)
 // returns undefined if the user does not exist
-async function getPublicUserInfo(dbPool, id) {
+async function getPublicUserInfo(dbPool, id, includeEmail=false) {
     if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
     try {
         const privateUser = await getUserFromID(dbPool, id);
@@ -662,6 +720,10 @@ async function getPublicUserInfo(dbPool, id) {
         myUser.lastActive = privateUser.lastActive;
         myUser.hasProfilePicture = Boolean(privateUser.hasProfilePicture);
         myUser.countryCode = privateUser.countryCode;
+        myUser.isAdmin = privateUser.isAdmin;
+        if (includeEmail) {
+            myUser.email = privateUser.email;
+        }
         return myUser;
     } catch (err) {
         console.error("Could not convert private user to public user: ", err);
@@ -749,6 +811,25 @@ async function updateUserName(dbPool, newUsername, userID) {
     }
 }
 
+async function updateUserEmail(dbPool, newEmail, userID) {
+    if (dbPool === undefined) { throw new Error('dbPool is required as an argument');}
+    try {
+        if (newEmail === undefined) { throw new Error('newEmail is required as an argument');}
+        if (userID === undefined) { throw new Error('userID is required as an argument');}
+
+        const taken = await isEmailInUse(dbPool, newEmail)
+        if (taken) {
+            return 'taken'
+        }
+        const query = `UPDATE ${process.env.MYSQL_USER_TABLE} SET email = ? WHERE id = ?`
+        await dbPool.query(query, [newEmail, userID]);
+
+    } catch (err) {
+        console.error("Failed to updateUsername: ", err);
+        return 'err';
+    }
+}
+
 async function updateLastActive(dbPool, userID) {
     if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
     if (userID === undefined) { throw new Error('userID is required as an argument')}
@@ -794,6 +875,23 @@ async function updateUserCountryCode(dbPool, CC, userID) {
         console.error('Failed to update user country code: ', err);
     }
 }
+
+async function isThreadLockedToAdmins(dbPool, channelID, threadID) {
+    try {
+        if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
+        if (channelID === undefined) { throw new Error('channelID is required as an argument')}
+        if (threadID === undefined) { throw new Error('threadID is required as an argument')}
+
+
+        const thread = await getThreadFromID(dbPool, channelID, threadID);
+        if (thread.lockedToAdmins == true) {
+            return true;
+        } return false;
+    } catch (err) {
+        console.error("Failed getting is thread locked to admins: ", err);
+        return true; // security fallback
+    }
+}
 async function getMessagesFromThread(dbPool, channelID, threadID) {
     try {
         if (dbPool === undefined) { throw new Error('dbPool is required as an argument')}
@@ -832,29 +930,26 @@ async function getMessageChunkFromThread(dbPool, channelID, threadID, chunkIndex
         const chunkSize = Number(process.env.MESSAGE_CHUNK_SIZE);
         const messageTableName = getMessageTableNameFromThread(channelID, threadID);
 
-        const offset = chunkIndex * chunkSize;
 
         const [countResult] = await dbPool.query(`SELECT COUNT(*) AS count FROM ${messageTableName}`);
         const totalMessages = countResult[0].count;
 
-        // Out of bounds check
-        if (offset >= totalMessages) {
-            return [];
-        }
+     
 
         //const rBegin = totalMessages - ((chunkIndex+1)*chunkSize) + 1;
         //let rEnd = totalMessages - (chunkIndex*chunkSize) + 1;
-        const rBegin = roundTo(totalMessages - (chunkIndex*chunkSize) + 1, chunkSize);
-        let rEnd = roundTo(totalMessages - ((chunkIndex-1)*chunkSize) + 1, chunkSize);
-        if (rEnd < chunkSize) {
-            rEnd = chunkSize;
+        // const rBegin = Math.floor(totalMessages - (chunkIndex*chunkSize) + 1, chunkSize);
+        // let rEnd = Math.floor(totalMessages - ((chunkIndex-1)*chunkSize) + 1, chunkSize);
+        // if (rEnd < chunkSize) {
+        //     rEnd = chunkSize;
+        // }
+        // Out of bounds check
+        if ((1+ totalMessages - ((chunkIndex+1)*chunkSize)) > totalMessages) {
+            return [];
         }
+        const query = `SELECT * FROM ${messageTableName} ORDER BY id DESC LIMIT ${chunkSize} OFFSET ${chunkIndex*chunkSize};`
 
-        const query = `
-            SELECT * FROM ${messageTableName} WHERE id BETWEEN ? AND ? ORDER BY id DESC;
-        `;
-
-        const [rows] = await dbPool.query(query, [rBegin, rEnd]);
+        const [rows] = await dbPool.query(query);
 
         for (let row of rows) {
             const publicUser = await getPublicUserInfo(dbPool, row.ownerID);
@@ -862,10 +957,11 @@ async function getMessageChunkFromThread(dbPool, channelID, threadID, chunkIndex
             row.ownerHasProfilePicture = publicUser.hasProfilePicture;
             row.date = row.date.toISOString();
         }
+
         return rows;
         
     } catch (err) {
-        //console.error("Failed to get message chunk from thread: ", err);
+        console.error("Failed to get message chunk from thread: ", err);
         return undefined;
     }
 }
@@ -877,6 +973,15 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
         if (threadID === undefined) { throw new Error('threadID is required as an argument')}
         if (userID === undefined) { throw new Error('userID is required as an argument')}
         if (messageContent === undefined) { throw new Error('messageContent is required as an argument')}
+
+        
+        const isLockedToAdmins = await isThreadLockedToAdmins(dbPool, channelID, threadID);
+        if (isLockedToAdmins) {
+            const isAdmin = await isUserAdmin(dbPool, userID);
+            if (isAdmin == false) {
+                return 'unauthorized';   
+            }
+        }
 
         const threadMessageTableName = getMessageTableNameFromThread(channelID,threadID);
         const query = `INSERT INTO ${threadMessageTableName} (ownerID, content, isReplyTo, hasImg, imgExt, date) VALUES (?, ?, ?, ?, ?, ?)`
@@ -905,6 +1010,9 @@ async function addMessageToThread(dbPool, channelID, threadID, userID, messageCo
             const base64Data = imgData.replace(/^data:image\/(png|jpg|jpeg|gif);base64,/, '');
             const imageBuffer = Buffer.from(base64Data, 'base64');
 
+            if (imageBuffer.length > process.env.MAX_ATTACHED_IMG_SIZE) {
+                return false;
+            }
             const filePath = path.join('public/msgImgAttachments', `${channelID}`, `${threadID}`, `${messageID}.${imgExt}`); // Save in the 'uploads' folder
             
             // Save the image file to disk
@@ -1077,11 +1185,11 @@ async function removeUnreadPingsOfUserFromThread(dbPool, userID, channelID, thre
     }
 }
 export default {
-    initDB, clearDB, initChannels, getChannelCount, registerUser, updateUserPassword,
+    initDB, clearDB, initChannels, getChannelCount, registerUser, updateUserPassword, updateUserEmail,
     isEmailInUse, getUserByUsername, getUserFromID, isUsernameTaken, resetUserPasswordResetToken,
-    setUserPasswordResetToken, createChannel, getChannels, addThreadToChannel, getThreadsFromChannel, 
-    getThreadFromID, deleteThread, getDescriptionFromChannel, getPublicUserInfo,
-    updateUserName, updateUserDescription, updateUserCountryCode, getMessagesFromThread, 
+    setUserPasswordResetToken, createChannel, getChannels, addThreadToChannel, getThreadsFromChannel, setPinnedThreadOfChannel,
+    getThreadFromID, deleteThread, getDescriptionFromChannel, getPublicUserInfo, isUserAdmin, setUserAdminState,
+    updateUserName, updateUserDescription, updateUserCountryCode, getMessagesFromThread, isThreadLockedToAdmins,
     getMessageChunkFromThread, addMessageToThread, deleteMessageFromThread, 
     getMessageCountOfThread, giveUserProfilePicture, updateUserMutedChannel, getUserMutedChannels,
     getUnreadPingsFromUser, addUnreadPingToUser, removeUnreadPingsOfUserFromThread

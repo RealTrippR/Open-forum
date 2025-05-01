@@ -201,6 +201,6 @@ function getCountries() {
 function getCountryCodeImageSource(CC) {
     CC = CC.toLowerCase();
     // https://github.com/hampusborgos/country-flags
-    const flagURL = `https://raw.githubusercontent.com/hampusborgos/country-flags/70d8cfc03972162a2c93c985f4a9b7a8b7f1a8e0/svg/${CC}.svg`;
+    const flagURL = `${window.baseURL}/icons/countryFlags/${CC}.svg`;
     return flagURL;
 }

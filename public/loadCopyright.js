@@ -7,12 +7,21 @@ that goes on the bottom on the page
 function loadCopyright(isIndexPage) {
     const copyrightDiv = document.getElementById("copyright-div");
     let HTML = '';
-    if (isIndexPage!=true) { HTML += `<HR style="border: var(--stdBorder);">`;};
+    if (isIndexPage!=true) {
+        HTML += `<HR id='copyrightHR'>`;
+    };
     HTML += `<CENTER> <BR>
-    <p class='stdText' style='font-size: 14px'> © 2025 Tripp Robins </p> 
-
+    <p id='openForumCopyrightNotice' class='stdText'> © 2025 Tripp Robins </p> 
     <BR></CENTER>`;
     copyrightDiv.innerHTML = HTML;
+
+    const copyrightNotice = document.getElementById('openForumCopyrightNotice');
+    copyrightNotice.style.fontSize = '14px';
+
+    const copyrightHR = document.getElementById('copyrightHR');
+    if (copyrightHR) {
+        copyrightHR.style.border = 'var(--stdBorder)'
+    }
 
     copyrightDiv.style.position = "absolute";
     if (isIndexPage==true) {

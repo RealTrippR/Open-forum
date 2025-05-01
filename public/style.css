@@ -43,6 +43,13 @@ body {
     padding: 0;
 }
 
+.HR {
+    border: var(--stdBorder);
+}
+
+.invisInput {
+    display: none;
+}
 /*--------------------------------------------*/
 /*NAVBAR*/
 
@@ -233,19 +240,21 @@ div.channelNameHeader {
     overflow: hidden; /* Hide scrollbars */
     scrollbar-width: none;
 
-    position: relative; /* Parent positioning context */
     position: absolute ;
     top: 84px;
     left: var(--channelBarWidth);
     width: calc(100% - var(--channelBarWidth) - 270px);
     margin-bottom: var(--chatTypeBoxHeight);
+    height: calc(100% - 84px - var(--chatTypeBoxHeight) - 40px);
+    margin-bottom: 100px;
     min-width: var(300px);
     background-color: var(--backgroundColor);
     border: 1px solid black;
     padding: 0px;
-    height: calc(100% - 84px);
+    /*height: calc(100% - 84px);*/
 }
 .threadMessagesHolder ul {
+    
     overflow: hidden;
     scrollbar-width: none;
 
@@ -258,7 +267,7 @@ div.channelNameHeader {
     margin-left: 10px;
     padding: 0px;
     width: calc(100% - 0px);
-    max-height: calc(100% - 100px);
+    max-height: calc(100%);
 }
 
 .threadMessagesHolder ul li {
@@ -392,16 +401,18 @@ div.chatTypeDiv {
 }
 
 .message-right-click-box {
-    position: fixed; /*relative to scren space*/
+    position: absolute; /*relative to scren space*/
     background-color: var(--navBarColor);
     border: var(--stdBorder);
     box-shadow: var(--stdMinorShadow);
     padding: 0px;
     margin: 0px;
-    z-index: 5; /* Ensure it appears above other elements */
+    z-index: 3; /* Ensure it appears above other elements */
     display: none;
 }
 
+.message-right-click-box div,
+.message-right-click-box button,
 .message-right-click-button {
     border: var(--stdBorder);
     padding: 0px;
@@ -409,12 +420,17 @@ div.chatTypeDiv {
     height: 21px;
 }
 
+.message-right-click-box div:hover,
+.message-right-click-box button:hover,
 .message-right-click-button:hover {
+    cursor: pointer;
     background-color: color-mix(in srgb, var(--navBarColor) 90%, black);
 }
 
+.message-right-click-box div p,
+.message-right-click-box button p,
 .message-right-click-box p {
-    cursor: default;
+    cursor: pointer;
     margin: 1px;
     text-align: center;
     padding-top:0;
@@ -428,28 +444,23 @@ div.chatTypeDiv {
 
 /*--------------------------------------------*/
 /*USER ACCOUNT MANAGEMENT*/
-.userLoginButton {
 
-}
-
-.userNavbarButton {
-    
-}
-
-.userProfileImage {
-
-}
-
-#pfp-img{
+#pfp-img {
     border: var(--stdBorder);
     box-shadow: var(--stdShadow);
     margin: 10px;
     padding: 0px;
 }
+
 #pfp-img:hover {
+    cursor: pointer;
     filter: brightness(0.5) saturate(1.5);
 }
 
+#pfp-img.no-hover:hover {
+    filter: none !important;
+    cursor: default !important;
+}
 /*--------------------------------------------*/
 /*GENERAL*/
 
@@ -488,8 +499,54 @@ div.chatTypeDiv {
     text-align: center;
     text-shadow: var(--stdMinorShadow);
 }
+.errorTextFixedHeight {
+    bottom: 1px;
+    margin-top: -9px;
+    color: rgb(224, 26, 26);
+    position: relative;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--stdMinorFontFamily);
+    text-decoration: none;
+    text-align: center;
+    text-shadow: var(--stdMinorShadow);
+    height: 12px;
+}
 
-/* Add this to your CSS */
+.login-error-msg {
+    color: red;
+    display: none;
+}
+
 .placeholder::placeholder {
     color: var(--mainTextColor) 
+}
+
+#channelInfoHolder {
+    width: calc(100% - var(--channelBarWidth) - var(--sidePanelWidth));
+}
+
+#edit-user-description-button {
+ background-color: var(--navBarColor);
+   cursor: pointer;
+   border: var(--stdBorder);
+   box-shadow: var(--stdMinorShadow);
+    align-items: center;
+     justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin: 5px;
+}
+
+.thhIconDiv {
+    position: absolute;
+    margin-top: 6px;
+    display: flex;
+    gap: 10px
+}
+.thhIcon {
+    width: 20px;
+    height: 20px;
+    border: var(--stdBorder);
+    box-shadow: var(--stdMinorShadow);
 }

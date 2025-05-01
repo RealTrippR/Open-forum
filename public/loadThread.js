@@ -5,13 +5,36 @@ function stringToBool(str) {
     return String(str).toLowerCase() === "true";
 }
 
+async function disconnectSocketChatEvents() {
+    if (window.currentThreadID != undefined) { // remove previous event listeners
+        socket.off(`#${window.currentThreadID}new-chat-message`);
+
+        socket.off(`#${window.currentThreadID}delete-chat-message`, deleteChatMessageAtServerRequest);
+        console.log(`#${window.currentThreadID}new-chat-message`)
+    }
+
+}
+
 function clearMsgUL() {
     const msgUL = document.getElementById('message-UL');
-    for (let child of msgUL.children) {
-        if (child.dataset.messageID != undefined) {
-            child.remove(); // only delete messages
-        }
-    }
+    msgUL.querySelectorAll('li').forEach(el => el.remove());
+    // for (let child of msgUL.children) {
+    //     if (child.dataset.messageID != undefined) {
+    //         child.remove(); // only delete messages
+    //     }
+    // }
+}
+
+function checkIntersection(element1, element2) {
+    const rect1 = element1.getBoundingClientRect();
+    const rect2 = element2.getBoundingClientRect();
+
+    const overlap = !(rect1.right < rect2.left || 
+        rect1.left > rect2.right || 
+        rect1.bottom < rect2.top || 
+        rect1.top > rect2.bottom)
+
+    return overlap
 }
 
 function setReplyingTo(msgElement) {
@@ -26,12 +49,28 @@ function setReplyingTo(msgElement) {
     if (msgElement.children == undefined || msgElement.children.length == 0) {return;} // fix strange bug where the children haven't loaded in yet
     {
         replyMsgDiv.style.display = 'block';
-        let HTML = ``;     
-        HTML += `<img src='/icons/ReplyArrow.png' width=30 height=30 id='replyIcon' style='position: absolute; margin: 0; padding: 0; left: -4px; top: 3px;'>`;
-        HTML += `<p class = "stdText" style="font-size: 11px; margin-left: 22px; text-align: left;">  </p> `;
-        replyMsgDiv.innerHTML  = HTML;
+        replyMsgDiv.innerHTML = ''; // clear old content
 
-
+        const img = document.createElement('img');
+        img.src = `${window.baseURL}/icons/ReplyArrow.png`;
+        img.width = 30;
+        img.height = 30;
+        img.id = 'replyIcon';
+        img.style.position = 'absolute';
+        img.style.margin = '0';
+        img.style.padding = '0';
+        img.style.left = '-4px';
+        img.style.top = '3px';
+        
+        const p = document.createElement('p');
+        p.className = 'stdText';
+        p.style.fontSize = '11px';
+        p.style.marginLeft = '22px';
+        p.style.textAlign = 'left';
+        p.textContent = ''; // Or set some text if needed
+        
+        replyMsgDiv.appendChild(img);
+        replyMsgDiv.appendChild(p);
         
 
         let elemText = "";
@@ -53,6 +92,7 @@ function setReplyingTo(msgElement) {
         if (elemText.length > 20) {
             elemText = elemText.slice(0,20) + `...`
         }
+
         replyMsgDiv.children[1].innerText = `Replying To: ${msgElement.querySelector('.msg-username').innerHTML}` + `  | ` + `${elemText}`
     }
 }
@@ -108,7 +148,7 @@ function getRelativeTimeStr(dateString) {
 async function getThreadMessageChunkFromServer(channelID, threadID, chunkIndex) {
     let res;
     try {
-        res = await fetch('/api-get-message-chunk-from-thread', {
+        res = await fetch(`${window.baseURL}/api-get-message-chunk-from-thread`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -131,7 +171,7 @@ async function getThreadMessageChunkFromServer(channelID, threadID, chunkIndex) 
 async function getThreadMessagesFromServer(channelID, threadID) {
     return (async () => {
     try {
-        const res = await fetch('/api-get-messages-from-thread', {
+        const res = await fetch(`${window.baseURL}/api-get-messages-from-thread`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -156,11 +196,18 @@ function sendMessage(message, imgData = null, imgURL = null) {
     message = message.replace(/\n+$/, ''); // get rid of any trailing newlines
 
     const msgUL = document.getElementById('message-UL');
-    const lastElem = msgUL.children[msgUL.children.length-1];
+       
+    // Get only the children that have a dataset.messageID
+    const validChildren = Array.from(msgUL.children).filter(child => child.dataset.messageID !== undefined);
+
+    const lastElem = validChildren[validChildren.length-1];
     let lastID;
     if (lastElem != undefined) {
         lastID = Number(lastElem.dataset.messageID);
     } else {
+        lastID = 0;
+    }
+    if (lastID == null || lastID == undefined) {
         lastID = 0;
     }
 
@@ -181,6 +228,8 @@ function sendMessage(message, imgData = null, imgURL = null) {
         pingUser(username.slice(1), message, lastID+1);
     }
 
+
+    console.log('message:',{message: message, channelID: window.currentChannel.id, threadID: window.currentThreadID, isReplyTo: getReplyingTo(), imgData: imgData})
     socket.emit('send-message', {message: message, channelID: window.currentChannel.id, threadID: window.currentThreadID, isReplyTo: getReplyingTo(), imgData: imgData});
 
     const now = new Date();
@@ -219,7 +268,11 @@ function recieveMessageFromServer(req) {
     const datetime = now.toISOString().slice(0, 19).replace('T', ' ') // converts to MySQL datetime
 
     const msgUL = document.getElementById('message-UL');
-    const lastElem = msgUL.children[msgUL.children.length-1];
+    
+    // Get only the children that have a dataset.messageID
+    const validChildren = Array.from(msgUL.children).filter(child => child.dataset.messageID !== undefined);
+
+    const lastElem = validChildren[validChildren.length-1];
     let lastID;
     if (lastElem != undefined) {
         lastID = Number(lastElem.dataset.messageID);
@@ -267,10 +320,10 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
     
     
     // load PFP
-    let pfpImgSrc = "\\icons\\default-pfp.png";
+    let pfpImgSrc = `${window.baseURL}/icons/default-pfp.png`;
 
     if (messageOwner.hasProfilePicture == true) {
-        pfpImgSrc = `\\profile-pictures\\${messageOwner.username}.jpg`
+        pfpImgSrc = `${window.baseURL}/profile-pictures/${messageOwner.username}.jpg`
     }
     {
         const li = document.createElement('li');
@@ -324,7 +377,7 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
         profileDiv.style.marginTop = `${replyHeaderHeightPX}px`
 
         const profileLink = document.createElement('a');
-        profileLink.href = `/users/${messageOwner.username}`;
+        profileLink.href = `${window.baseURL}/users/${messageOwner.username}`;
         profileLink.style.display = 'inline-block';
         profileLink.style.width = '35px';
         profileLink.style.height = '35px';
@@ -414,20 +467,29 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
             msgRightclickDiv.style.display = 'none';
             msgRightclickDiv.associatedMessageElement = null;
         });
+
         li.addEventListener('contextmenu', (event) => { 
             
             event.preventDefault();
  
+            event.stopPropagation()
+
             const msgRightclickDiv = document.getElementById('message-right-click-box');
             msgRightclickDiv.innerHTML = ``;
             
-            msgRightclickDiv.associatedMessageElement = event.target;
+            msgRightclickDiv.associatedMessageElement = event.currentTarget; // note that event.currentTarget and event.target ARE NOT the same thing 
             msgRightclickDiv.dataset.messageID = li.dataset.messageID;
 
-            msgRightclickDiv.style.display = 'block';
+            msgRightclickDiv.style.display = 'inline';
                 // Position the right-click menu at the mouse coordinates
-            msgRightclickDiv.style.left = `${event.pageX}px`;
-            msgRightclickDiv.style.top = `${event.pageY}px`;
+
+            const rect = msgUL.getBoundingClientRect();
+
+            const y = event.clientY - rect.top;
+            const x = event.clientX - rect.left;
+        
+            msgRightclickDiv.style.left = `${x}px`;
+            msgRightclickDiv.style.top = `${y}px`;
             msgRightclickDiv.style.width = `100px`;
             msgRightclickDiv.style.height = `auto`;
             msgRightclickDiv.style.padding = '0px';
@@ -435,44 +497,65 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
             const copyMsgLinkButton = document.createElement('div'); copyMsgLinkButton.className = 'message-right-click-button'
             const replyToMsgButton = document.createElement('div'); replyToMsgButton.className = 'message-right-click-button'
             const deleteMsgButton = document.createElement('div'); deleteMsgButton.className = 'message-right-click-button'
+
+            msgRightclickDiv.appendChild(copyMsgLinkButton);
+
+            
             copyMsgLinkButton.innerHTML += `<p> Copy Link </p>`;
             copyMsgLinkButton.addEventListener('click', () => {
-                const rootURL = window.location.origin;
-                const msgURL = `${rootURL}/channels/${window.currentChannel.id}/${window.currentThreadID}/messages/${msgRightclickDiv.dataset.messageID}`;
+                //const rootURL = `${window.location.origin}/${window.baseURL}`;
+                const msgURL = `${window.baseURL}/channels/${window.currentChannel.id}/${window.currentThreadID}/messages/${msgRightclickDiv.dataset.messageID}`;
                 // copy URL to OS clipboard
                 navigator.clipboard.writeText(msgURL);
             });
 
+            if (window.user != undefined) {
+                if (window.loggedIn == true) { 
+                    replyToMsgButton.innerHTML += `<p> Reply </p>`;
+                }
 
-            if (window.loggedIn == true) { 
-                replyToMsgButton.innerHTML += `<p> Reply </p>`;
+                if (li.dataset.ownerUsername == window.user.username) {
+                    deleteMsgButton.innerHTML += `<p> Delete </p>`;
+                }
+
+                if (window.loggedIn == true) { 
+                    const chatMsgHolder = document.getElementById('chat-message-holder'); // the div that holds the message that the user is about to send
+                    replyToMsgButton.addEventListener('click', () => {
+                        setReplyingTo(msgRightclickDiv.associatedMessageElement);
+                        chatMsgHolder.focus();
+                    });
+                }
+                
+                if (li.dataset.ownerUsername == window.user.username) {
+                    deleteMsgButton.addEventListener('click', () => {
+                        deleteMessage(li.dataset.messageID, msgRightclickDiv.associatedMessageElement);
+                    });
+                }
+
+                if (window.loggedIn == true) { 
+                    msgRightclickDiv.appendChild(replyToMsgButton);
+                }
+                if (li.dataset.ownerUsername == window.user.username) {
+                    msgRightclickDiv.appendChild(deleteMsgButton);
+                }
             }
 
-            if (li.dataset.ownerUsername == window.user.username) {
-                deleteMsgButton.innerHTML += `<p> Delete </p>`;
+
+
+            { // test intersection with chat type div, if so move it up a bit
+                const chatTypeDiv = document.getElementById('chatTypeDiv');
+
+                if (checkIntersection(chatTypeDiv, msgRightclickDiv) == true) {
+                    msgRightclickDiv.style.marginTop = `${-msgRightclickDiv.getBoundingClientRect().height}px`;
+                } else {
+                    // double check to fix alternating issue
+                    msgRightclickDiv.style.marginTop = `0px`
+                    if (checkIntersection(chatTypeDiv, msgRightclickDiv) == true) {
+                        msgRightclickDiv.style.marginTop = `${-msgRightclickDiv.getBoundingClientRect().height}px`;
+                    }
+                }
             }
 
-            if (window.loggedIn == true) { 
-                const chatMsgHolder = document.getElementById('chat-message-holder'); // the div that holds the message that the user is about to send
-                replyToMsgButton.addEventListener('click', () => {
-                    setReplyingTo(msgRightclickDiv.associatedMessageElement);
-                    chatMsgHolder.focus();
-                });
-            }
-            
-            if (li.dataset.ownerUsername == window.user.username) {
-                deleteMsgButton.addEventListener('click', () => {
-                    deleteMessage(li.dataset.messageID, msgRightclickDiv.associatedMessageElement);
-                });
-            }
-
-            msgRightclickDiv.appendChild(copyMsgLinkButton);
-            if (window.loggedIn == true) { 
-                msgRightclickDiv.appendChild(replyToMsgButton);
-            }
-            if (li.dataset.ownerUsername == window.user.username) {
-                msgRightclickDiv.appendChild(deleteMsgButton);
-            }
         });
     }
     const messageItems = document.querySelectorAll('.threadMessagesHolder ul li');
@@ -511,24 +594,66 @@ function addMessageToMessageHolder(message, messageDateTime, messageOwner, messa
 
 // opens the thread by ID, by default it only loads the first chunk
 async function loadThreadFromID(threadID,loadFirstTwoChunks=true) {
+    
     threadID = Number(threadID);
-    removeUnreadPingsFromThread(window.currentChannel.id,threadID)
-
-    window.loadedChunkIndices = [];
+    if (window.user != undefined) {
+        removeUnreadPingsFromThread(window.currentChannel.id,threadID)
+    }
 
     clearMsgUL();
       
     window.currentThreadID = threadID;
 
-    
+    let currentThread = undefined;
+    for (let thread of window.currentChannel.threads) {
+        if (thread == undefined || thread.id == undefined) {
+            console.warn("Invalid thread handle: ", thread);
+            continue;
+        }
+        if (thread.id == threadID) {
+            currentThread = thread;
+            break;
+        }
+    }
+
+    let channelNameHeader = document.getElementById('channelNameHeader');
+    if (channelNameHeader.children.length == 0) {
+        createChannelNameHeader();
+    }
+    if (channelNameHeader && channelNameHeader.children.length == 2) {
+        channelNameHeader.children[0].innerText = currentThread.name;
+        channelNameHeader.children[1].innerText = currentThread.description;
+    }
+
+
+
+    const chatTypeBoxDiv = document.getElementById('chatTypeDiv');
+
+    if (currentThread.lockedToAdmins == true && window.user !=undefined && window.user.isAdmin != true) {
+        chatTypeBoxDiv.style.display = 'none';
+    } else {
+        chatTypeBoxDiv.style.display = 'flex';
+    }
+
+    // user is logged out and can't send messages
+    if (window.user == undefined) {
+        const threadmessagesHolder = document.getElementById('threadMessagesHolder');
+        threadmessagesHolder.style.height = 'calc(100%-100px)'
+        chatTypeBoxDiv.style.display = 'none';
+
+        const msgUL = document.getElementById('message-UL')
+        msgUL.style.height = '100%'
+        msgUL.style.maxHeight = '100%' 
+    }
+
     // hide the threads holder.
     const threadsHolder = document.getElementById("channelThreadsHolder");
     threadsHolder.style.display = 'none';
 
-    if (loadFirstTwoChunks) {
+    if (loadFirstTwoChunks == true) {
+        
         await loadMsgChunk(0);
         await loadMsgChunk(1);
-
     }
 }
 
@@ -566,9 +691,9 @@ function initMessageHolder() {
     msgContentHolderDivOuter.style.width = '100%';
     
 
-    {
+    if (window.user != undefined) {
         // invis file uploader
-        const HTML = '<input type="file" id="upload-img-attachment" style="display: none">';
+        const HTML = '<input type="file" id="upload-img-attachment" class = "invisInput">';
         document.body.insertAdjacentHTML("beforeend", HTML);
         /************************************************************/
         /* UPLOAD ATTACHMENTS */
@@ -583,7 +708,7 @@ function initMessageHolder() {
         attachImgToMessageButton.style.boxShadow = 'var(--stdMinorShadow)';
         attachImgToMessageButton.style.cursor = 'pointer';
         attachImgToMessageButton.style.bottom = '0px'
-        attachImgToMessageButton.innerHTML += `<img width=28 height=28 src="/icons/photo.png">`
+        attachImgToMessageButton.innerHTML += `<img width=28 height=28 src="${window.baseURL}/icons/photo.png">`
         chatTypeBoxDiv.appendChild(attachImgToMessageButton);
 
         const invisFileUploader = document.getElementById('upload-img-attachment');
@@ -632,16 +757,17 @@ function initMessageHolder() {
 
             invisFileUploader.addEventListener('change', () => {
                 const file = event.target.files[0];
-                
+                if (!file) {return;}
+
                 const validType = file.name.toLowerCase().endsWith('.gif') || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')  || file.name.toLowerCase().endsWith('.jpeg');
                 
                 
-                if (file && validType && file.size <= 1500000 /*1.5 MB or less*/) {
+                if (file && validType && file.size <= window.maxImgSize) {
                     imgWrapper.style.display = 'inline-block'
                     stagingImg.src = URL.createObjectURL(file);
-                    //askServerToAttachImageToMessage(formData);
                 } else {
-                    alert('Invalid image, must be a GIF, PNG or JPEG and less than 1.5 MB in size.')
+                    alert(`Invalid image, must be a GIF, PNG or JPEG and less than ${window.maxImgSize/1000000} MB in size.`)
+                    event.target.value = '';
                 }   
             });
         });
@@ -694,92 +820,92 @@ function initMessageHolder() {
         msgHolder.innerHTML = '';
     }
 
-    const MAX_MESSAGE_LENGTH = 4096;
+    if (window.user != undefined) {
+        const MAX_MESSAGE_LENGTH = 4096;
 
-    msgHolder.contentEditable = true;
-    msgHolder.id = 'chat-message-holder'
-    msgHolder.className = 'chat-message-holder';
-    msgHolder.style.zIndex = '5'
-    msgHolder.style.marginLeft = '5px'
-    msgHolder.style.backgroundColor = 'var(--navBarColor)';
+        msgHolder.contentEditable = true;
+        msgHolder.id = 'chat-message-holder'
+        msgHolder.className = 'chat-message-holder';
+        msgHolder.style.zIndex = '5'
+        msgHolder.style.marginLeft = '5px'
+        msgHolder.style.backgroundColor = 'var(--navBarColor)';
 
-    msgHolder.maxlength = MAX_MESSAGE_LENGTH;
+        msgHolder.maxlength = MAX_MESSAGE_LENGTH;
 
-    msgContentHolderDivOuter.appendChild(msgHolder);
+        msgContentHolderDivOuter.appendChild(msgHolder);
 
-    const sendButton = document.getElementById("send-button");
+        const sendButton = document.getElementById("send-button");
 
-    // event listeners
-    msgHolder.addEventListener('keydown', (event) => {
-        const messageUL = document.getElementById('message-UL');
-        messageUL.style.marginTop = `-${msgHolder.clientHeight-35}px`
-        if (msgHolder.innerText.length > MAX_MESSAGE_LENGTH) {
-            msgHolder.innerText = msgHolder.innerText.slice(0, MAX_MESSAGE_LENGTH);
-        } else {
-            if (event.key == 'Escape') {
-                setReplyingTo(null);
-                return;
-            }
-            if (event.key == 'Enter' && msgHolder.innerText.length != 0 && !event.shiftKey) {
-                event.preventDefault();
-                sendButton.click();
-            }
-            if (event.key == 'Enter' && !event.shiftKey) {
-
-            }
-        }
-        if (msgHolder.innerText.length == 0) {
-            messageUL.style.marginTop = `5px`;
-        }
-    })
-
-    sendButton.addEventListener('click', () => {
-        console.log('file')
-
-        if (msgHolder.innerText.length != 0 || stagingImgWrapper.style.display != 'none') { // cannot send a blank message, unless it has an image
-
-            const stagingImgWrapper = document.getElementById('stagingImgWrapper');
-            
-            const invisFileUploader = document.getElementById('upload-img-attachment');
-
-            const stagingImgSrc = document.getElementById('stagingImg').src;
-
-            
+        // event listeners
+        msgHolder.addEventListener('keydown', (event) => {
+            const messageUL = document.getElementById('message-UL');
+            messageUL.style.marginTop = `-${msgHolder.clientHeight-35}px`
             if (msgHolder.innerText.length > MAX_MESSAGE_LENGTH) {
-                msgHolder.innerText = msgHolder.innerText.slice(0, MAX_MESSAGE_LENGTH)
+                msgHolder.innerText = msgHolder.innerText.slice(0, MAX_MESSAGE_LENGTH);
             } else {
+                if (event.key == 'Escape') {
+                    setReplyingTo(null);
+                    return;
+                }
+                if (event.key == 'Enter' && msgHolder.innerText.length != 0 && !event.shiftKey) {
+                    event.preventDefault();
+                    sendButton.click();
+                }
+                if (event.key == 'Enter' && !event.shiftKey) {
 
-                let imgData = null;
-                if (stagingImgWrapper.style.display != 'none') {
-                    const file = invisFileUploader.files[0];
-            
-                    if (file) {
-                        const formData = new FormData();
-                        formData.append('imgAttachment', file);  // Append the file to FormData (for server-side)
-            
-                        // Convert the image file to a Base64 string
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            imgData = event.target.result; // Base64 string of the image            
-                            sendMessage(msgHolder.innerText, imgData, stagingImgSrc);
-                            msgHolder.innerText = '';
-                        };
-
-                        // trigger the file reading process (to fire onload event)
-                        reader.readAsDataURL(file);
-                    }
-
-                    stagingImgWrapper.style.display = 'none';
-                } else {
-
-                    sendMessage(msgHolder.innerText, imgData)
-                    msgHolder.innerText = '';
                 }
             }
-            setReplyingTo(null);
-        }
-    }); 
+            if (msgHolder.innerText.length == 0) {
+                messageUL.style.marginTop = `5px`;
+            }
+        })
 
+        sendButton.addEventListener('click', () => {
+
+            if (msgHolder.innerText.length != 0 || stagingImgWrapper.style.display != 'none') { // cannot send a blank message, unless it has an image
+
+                const stagingImgWrapper = document.getElementById('stagingImgWrapper');
+                
+                const invisFileUploader = document.getElementById('upload-img-attachment');
+
+                const stagingImgSrc = document.getElementById('stagingImg').src;
+
+                
+                if (msgHolder.innerText.length > MAX_MESSAGE_LENGTH) {
+                    msgHolder.innerText = msgHolder.innerText.slice(0, MAX_MESSAGE_LENGTH)
+                } else {
+
+                    let imgData = null;
+                    if (stagingImgWrapper.style.display != 'none') {
+                        const file = invisFileUploader.files[0];
+                
+                        if (file) {
+                            const formData = new FormData();
+                            formData.append('imgAttachment', file);  // Append the file to FormData (for server-side)
+                
+                            // Convert the image file to a Base64 string
+                            const reader = new FileReader();
+                            reader.onload = function(event) {
+                                imgData = event.target.result; // Base64 string of the image            
+                                sendMessage(msgHolder.innerText, imgData, stagingImgSrc);
+                                msgHolder.innerText = '';
+                            };
+
+                            // trigger the file reading process (to fire onload event)
+                            reader.readAsDataURL(file);
+                        }
+
+                        stagingImgWrapper.style.display = 'none';
+                    } else {
+
+                        sendMessage(msgHolder.innerText, imgData)
+                        msgHolder.innerText = '';
+                    }
+                }
+                setReplyingTo(null);
+            }
+        }); 
+    }
     
     const threadMessagesHolder = document.getElementById('threadMessagesHolder'); // the main div that holds the open thread
                 
@@ -790,7 +916,7 @@ function initMessageHolder() {
     const msgRightClickDiv = document.createElement('div');
     msgRightClickDiv.id = 'message-right-click-box';
     msgRightClickDiv.className = 'message-right-click-box';
-    messageUL.appendChild(msgRightClickDiv);
+    threadMessagesHolder.appendChild(msgRightClickDiv);
 
         
     let lastscrolltop = messageUL.scrollTop;
@@ -805,13 +931,9 @@ function initMessageHolder() {
         requestAnimationFrame(syncScroll);
     }
     
-    // Start the sync on the next available frame
     requestAnimationFrame(syncScroll);
 
 
-    console.log('scrollHeight:', messageUL.scrollHeight);
-
-    console.log('messageUL is:', messageUL); // <- should not be null or undefined
     let initialScrollTop = messageUL.scrollTop; // Save the current scroll position
     //messageUL.removeEventListener('scroll', () => {}); // remove the old scroll event listener
     messageUL.addEventListener('wheel', async (event) => { // dynamically load chunks on scroll event
@@ -835,16 +957,20 @@ function initMessageHolder() {
             await loadMsgChunk(window.lowestChunkIndex - 1, false);
             messageUL.dataset.isLoading = false;
         }
+        
     });
 }
 
-async function setCurrentThreadID(threadID, loadHTML = true, loadMessageChunks=true) {
+async function setCurrentThreadID(threadID, loadHTML = true, loadFirstTwoChunks=true) {
     
+    disconnectSocketChatEvents();
+
     if (threadID == undefined) {
         window.currentThreadID = undefined;
         return;
     }
 
+  
     threadID = Number(threadID);
     if (window.user != undefined) {
         removeUnreadPingsFromThread(window.currentChannel.id, threadID);
@@ -856,13 +982,7 @@ async function setCurrentThreadID(threadID, loadHTML = true, loadMessageChunks=t
     window.highestChunkIndex = null;
 
     let state = {channelId: window.currentChannel.id}; if (window.threadID !=undefined) {state.threadID = window.threadID};
-    window.history.pushState(state, '', `/channels/${window.currentChannel.id}/${threadID}`);
-
-    if (window.currentThreadID) { // remove previous event listeners
-        socket.off(`#${window.currentThreadID}new-chat-message`);
-
-        socket.off(`#${threadID}delete-chat-message`, deleteChatMessageAtServerRequest);
-    }
+    window.history.pushState(state, '', `${window.baseURL}/channels/${window.currentChannel.id}/${threadID}`);
 
 
     ////////////////////////////////////////////////////////////////////////
@@ -873,8 +993,11 @@ async function setCurrentThreadID(threadID, loadHTML = true, loadMessageChunks=t
 
     socket.on(`#${threadID}delete-chat-message`, deleteChatMessageAtServerRequest)
 
-
     for (const thread of window.currentChannel.threads) {
+        if (thread == undefined || thread.id == undefined) {
+            console.warn("Invalid thread handle: ", thread);
+            continue;
+        }
         if (thread.id == threadID) {
             window.currentThread = thread;
             break;
@@ -895,7 +1018,7 @@ async function setCurrentThreadID(threadID, loadHTML = true, loadMessageChunks=t
             msgChatBox.style.display = 'flex';
         }
 
-        await loadThreadFromID(getCurrentThreadID(),loadMessageChunks);
+        await loadThreadFromID(getCurrentThreadID(), loadFirstTwoChunks);
     }
 }
 
@@ -919,12 +1042,14 @@ async function loadMsgChunk(chunkIndex, keepScrollPos = true) {
         return 0; // the chunk has already been loaded, skip
     }
 
+    console.log('loading idx: ', chunkIndex)
     // get messages
     const res = await getThreadMessageChunkFromServer(window.currentChannel.id, window.currentThreadID, chunkIndex)
     if (res == false) {
         console.error("Failed to get thread messages; bad server response");
     } 
     const threadMessages = res.messages;
+
 
     if (threadMessages.length == 0) { // return if the chunk is out of bounds
         isLoading = false;
@@ -950,7 +1075,7 @@ async function loadMsgChunk(chunkIndex, keepScrollPos = true) {
         
         let imgURL = null;
         if (message.hasImg == true) {
-            imgURL = `/msgImgAttachments/${window.currentChannel.id}/${getCurrentThreadID()}/${message.id}.${message.imgExt}`
+            imgURL = `${window.baseURL}/msgImgAttachments/${window.currentChannel.id}/${getCurrentThreadID()}/${message.id}.${message.imgExt}`
         }
 
         addMessageToMessageHolder

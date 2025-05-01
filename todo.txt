@@ -1,8 +1,8 @@
-[ ] Limit chars in usernames to only numbers, underscores, dashes, and letters
-[ ] Add protection against brute force attacks
-[ ] Fix bug: currently users can only view there profile pages
-[ ] Improve UI design?
-[ ] Implement thread and message searchings
+[x] Limit chars in usernames to only numbers, underscores, dashes, and letters
+[x] Add protection against brute force attacks
+[x] Fix bug: currently users can only view their profile pages
+[x] Improve UI design?
+[-] Implement thread and message searching
 [ ] Use JWT for sessions instead of a server side DB
-[ ] Optimize: Load messages in chunks
-[ ] Finish ping system and add a option to silence channels
+[x] Optimize: Load messages in chunks
+[x] Finish ping system and add a option to silence channels

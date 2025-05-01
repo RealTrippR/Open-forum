@@ -1,3 +1,4 @@
+import { type } from 'os';
 import dbUtils from '../Server/databaseUtils.js'
 
 let dbPool;
@@ -7,11 +8,20 @@ async function init(_dbPool, _io) {
     dbPool = _dbPool;
     io = _io;
 
+    // io.set('transports', [
+    //     'websocket'
+    //   , 'flashsocket'
+    //   , 'htmlfile'
+    //   , 'xhr-polling'
+    //   , 'jsonp-polling'
+    // ]);
+    
     let openSockets = [];
     /******************************************************** */
     /* SOCKET IO */
     
     io.on('connection', (socket) => {
+        //console.log('user connected!');
         if (socket.request.user && socket.request.user.username) {
             openSockets.push({ username: socket.request.user.username, socketID: socket.id });
         }
@@ -25,6 +35,10 @@ async function init(_dbPool, _io) {
                 if (socket.request.user==undefined) {
                     return; // user is not logged in
                 }
+                if (typeof(req.message) != "string") {return; /*invalid request*/}
+                if (typeof(req.channelID) != "number") {return; /*invalid request*/}
+                if (typeof(req.threadID) != "number") {return; /*invalid request*/}
+
                 if (req.message.length == 0 && (req.imgData==undefined || req.imgData == null)) {
                     return; // cannot send a blank message, unless it has an image attached to it
                 }
@@ -44,6 +58,7 @@ async function init(_dbPool, _io) {
 
                 const publicUserInfo = await dbUtils.getPublicUserInfo(dbPool, reqUserID);
 
+                if (publicUserInfo == undefined) {return;}
                 let imgExt = undefined;
                 if (req.imgData != null) {
                     // Extract the image format from the data URI
@@ -97,14 +112,23 @@ async function init(_dbPool, _io) {
                 const pingObj = {from: socket.request.user.username, channelID: req.channelID, threadID: req.threadID, messageID: req.messageID}
                 const targPrivUser = await dbUtils.getUserByUsername(dbPool,  req.targetUsername)
                 if (socketInfo) {
+                    // validate request
                     if (socket.request.user == undefined) {
                         return; // the user isn't logged in
                     }
+                    if (typeof(socket.request.user.username) != "string") {return}
+                    if (typeof(req.channelID) != "number") {return}
+                    if (typeof(req.threadID) != "number") {return}
+                    if (typeof(req.messageSlice) != "string") {return}
+
+
+                    /////////////
                     const targetSocket = io.sockets.sockets.get(socketInfo.socketID);
                     const tmp = await dbUtils.getThreadFromID(dbPool, req.channelID, req.threadID);
                     const threadName = tmp.name;
                     let messageSlice = req.messageSlice;
                     messageSlice = messageSlice.slice(0,32);
+                    
                     if (targetSocket) {
                         if (req.isReplyTo == undefined) {
                             req.isReplyTo == null;

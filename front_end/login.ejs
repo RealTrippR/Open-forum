@@ -3,65 +3,41 @@
 <head> 
     <meta charset="UTF-8">
     <title>OpenForum - Login</title>
-    <link rel="stylesheet" href="/style.css">
-    <link rel="stylesheet" href="/generalLogin.css">
+    <link rel="stylesheet" href="<%- baseURL %>/style.css">
+    <link rel="stylesheet" href="<%- baseURL %>/generalLogin.css">
 </head>
 <body>
+    <script id="locals-data" type="application/json">
+    {
+        "baseURL": "<%- baseURL %>"
+    }
+    </script>
+    
     <div id="navbar"></div>
     <div id="copyright-div"> </div>
-    <script src="/loadNavbar.js"></script>
-    <script src="/loadCopyright.js"></script>
+    <script src="<%- baseURL %>/setWindowVars.js"></script>
+    <script src="<%- baseURL %>/loadNavbar.js"></script>
+    <script src="<%- baseURL %>/loadCopyright.js"></script>
 
-    <script>
-        window.onload = function() {
-            loadNavbar();
-            loadCopyright();
-        };
-    </script>
+    
+    <div class="login-box">
+        <p class='login-box-header'>Login to OpenForum</p>
+        <br>
+        <div class="errorTextFixedHeight" id="error-msg"> </div>
 
-<div class="login-box">
-    <p class='stdText' style='font-family: var(--stdHeaderFontFamily); font-size: 30px; font-weight: 600; text-shadow: var(--stdShadow); margin-bottom: -3px;'>Login to OpenForum</p>
-    <br>
-    <div class="errorText" id="error-msg" style="height: 12px"> </div>
-
-    <form id="login-form" >
-      <input type="text" name="username" id="username" placeholder="Username" required><br>
-      <input type="password" name="password" id="password" placeholder="Password" required><br>
-      <input type="submit" value="Login">
-    </form>
-  
-    <p id="error-msg" style="color: red; display: none;"></p>
-  
-    <a class='page-button' href="/register">New? Register An Account</a>
-    <a class='stdText' style="display: inline-block; margin-top: 5px; margin-bottom: -5px;" href="/request-password-reset">Forgot Password?</a>
-  </div>
-  
-<script>
-    document.getElementById('login-form').addEventListener('submit', async function (e) {
-        e.preventDefault(); // Stop form submission
-
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        const errorMsg = document.getElementById('error-msg');
-
-
-        const res = await fetch('/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username, password: password })
-        });
-
-
-        if (res.ok) {
-            window.location.href = '/';
-        } else {
-            console.log()
-            // Login failed — show error message
-            //errorMsg.style.display = 'block';
-            errorMsg.textContent = 'Incorrect Username or Password';
-        }
-    });
-</script>
+        <form id="login-form" >
+        <input type="text" name="username" id="username" placeholder="Username" required><br>
+        <input type="password" name="password" id="password" placeholder="Password" required><br>
+        <input type="submit" value="Login">
+        </form>
+    
+        <p id="error-msg" class = 'login-error-msg'></p>
+    
+        <a class='page-button' href="<%- baseURL %>/register">New? Register An Account</a>
+        <a class='forgotPasswordButton' href="<%- baseURL %>/request-password-reset">Forgot Password?</a>
+    </div>
+    
+    <script src="<%- baseURL %>/initLoginEJS.js"> </script>
 
     <div id="copyright-div"> </div>
 

@@ -5,9 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title> OpenForum </title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="<%- baseURL %>/style.css">
 </head>
+
+<script id="locals-data" type="application/json">
+    {
+        "baseURL": "<%- baseURL %>",
+        "user": <%- user || "null" %>,
+        "maxImgSize": <%- maxImgSize %>,
+        "loggedIn": <%- loggedIn %>,
+        "messageChunkSize": <%- messageChunkSize %>,
+        "loadChannel": <%- typeof loadChannel !== "undefined" ? loadChannel : "null" %>,
+        "loadThread": <%- typeof loadThread !== "undefined" ? loadThread : "null" %>,
+        "loadMessage": <%- typeof loadMessage !== "undefined" ? loadMessage : "null" %>,
+        "channels": <%- channels %>
+    }
+</script>
 <body>
+<script src="<%- baseURL %>/setWindowVars.js"></script>
+
 <div id="navbar"> </div>
 <div id="channelBar"> </div>
 <div id="channelThreadsHolder" class="channelThreadsHolder"> </div> <!-- thread header buttons are stored here -->
@@ -16,118 +32,15 @@
 <div id="channelNameHeader" class="channelNameHeader"> </div>
 <div id="copyright-div"> </div>
 <!-- init socket.io -->
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  const socket = io();
-</script>
+<script src="<%- baseURL %>/socket.io/socket.io.js"></script>
+<script src="<%- baseURL %>/initSocket.js"></script>
 <!-- load webpage content -->
-<script src="/loadNavbar.js"> </script>
-<script src="/notifications.js"></script>
-<script src="/loadThread.js"> </script>
-<script src="/loadChannelBar.js"> </script>
-<script src="/loadChannel.js" ></script>
-<script src="/loadCopyright.js"></script>
+<script src="<%- baseURL %>/loadNavbar.js"> </script>
+<script src="<%- baseURL %>/notifications.js"></script>
+<script src="<%- baseURL %>/loadThread.js"> </script>
+<script src="<%- baseURL %>/loadChannelBar.js"> </script>
+<script src="<%- baseURL %>/loadChannel.js" ></script>
+<script src="<%- baseURL %>/loadCopyright.js"></script>
 
-<script>
-
-    function getChannelFromID(id) {
-        for (let channel of window.channels) {
-            if (channel.id == id) {
-                return channel;
-            }
-        }
-        return null;
-    }
-
-    function loadPage() {
-        
-        
-        window.user = undefined
-        <% if (locals.user) { %>
-            window.user = <%- user %>;
-        <% } %>
-        
-        if (window.user != undefined && window.user.unreadPings == undefined) {
-            window.user.unreadPings = []; // temp
-        }
-
-        window.loggedIn = <%- loggedIn %>
-        window.messageChunkSize = <%- messageChunkSize %>
-
-        window.lowestChunkIndex = null;
-        window.highestChunkIndex = null;
-
-        let _loadChannel = undefined;
-        <% if (locals.loadChannel) { %>
-            _loadChannel = <%- loadChannel %> - 1;
-        <% } %>
-        let _loadThread = undefined;
-        <% if (locals.loadThread) { %>
-            _loadThread = <%- loadThread %>;
-        <% } %>
-        let _loadMessage = undefined;
-        <% if (locals.loadMessage) { %>
-            _loadMessage = <%- loadMessage %>;
-        <% } %>
-        
-        loadNavbar();
-        // it's weird, but it works - don't touch it!
-        let _channels = <%- JSON.stringify(channels) %>
-        window.channels = JSON.parse(_channels);
-        console.log('auth:', window.loggedIn);
-        //window.channels = getTest;  // Converts to a valid JS object
-        //window.channels = JSON.parse('[{"id":1,"name":"Test Channel","topicListID":0}]' );
-        loadChannelBar();
-        createStagingThreadAndThreadInfoHolder()
-        initMessageHolder();
-
-
-        if (_loadChannel != undefined) {
-            let loadHTML = true;
-            if (_loadThread) {
-                loadHTML = false;
-            }
-            (async () => {
-
-                await setCurrentChannel(window.channels[_loadChannel], loadHTML);
-
-                if (_loadThread != undefined) {
-
-                    if (_loadMessage != undefined) {
-                        await setCurrentThreadID(_loadThread,true,false);
-                        await goToMessage(_loadMessage);
-                    } else {
-                        await setCurrentThreadID(_loadThread);
-                    }
-                }
-            })();
-
-        } else if (_loadThread == undefined) {
-            setCurrentChannel(window.channels[0]);
-        }
-    }
-    // 
-    window.onload = function() {
-        loadPage();
-        loadCopyright(true);
-    };
-
-    socket.on(`ping-recieve`, recievePingFromServer)
-
-    window.addEventListener('popstate', (event) => {
-    const state = event.state;
-    if (state && state.channelId) {
-        state.channelId = state.channelId - 1;
-        if (state.threadId) {
-            setCurrentChannel(window.channels[state.channelId], false);
-            setCurrentThread(state.threadId);
-        } else {
-            setCurrentChannel(window.channels[state.channelId]);
-        }
-    } else {
-        // fallback if no state is present
-        setCurrentChannel(window.channels[0]);
-    }
-});
-</script>
+<script src="<%- baseURL %>/initIndexEJS.js"></script>
 </body>

@@ -30,7 +30,7 @@ body {
     align-items: center;
 }
 .login-box h2 {
-    margin-bottom: 24px;
+    margin-bottom: 15px;
 }
 
 .login-box input[type="text"],
@@ -39,11 +39,14 @@ body {
     width: 100%;
     padding: 10px;
     margin: 8px 0 16px 0;
+    margin-bottom: 10px;
+    margin-top: 10px;
     font-size: 14px;
     font-family: var(--stdMinorFontFamily);
 }
 
 .login-box input[type="submit"] {
+    text-align: center;
     background: var(--navBarColor);
 
     color: white;
@@ -89,4 +92,33 @@ body {
 .login-box a:hover {
     background:  color-mix(in srgb, var(--backgroundColor) 70%, black);
 
+}
+
+.login-box-header {
+    margin: 1px;
+    text-align: center;
+    padding-top:0;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-family: var(--stdMinorFontFamily);
+    font-weight: 400;
+    font-family: var(--stdHeaderFontFamily); font-size: 30px; font-weight: 600; text-shadow: var(--stdShadow);
+}
+#register-form {
+    align-items: center;
+}
+
+.forgotPasswordButton {
+    margin: 1px;
+    text-align: center;
+    padding-top:0;
+    color: var(--mainTextColor);
+    text-shadow: var(--stdMinorShadow);
+    text-decoration: none;
+    font-family: var(--stdMinorFontFamily);
+    font-weight: 400;
+    display: inline-block;
+    margin-top: 5px;
+    margin-bottom: -5px;
 }

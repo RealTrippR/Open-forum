@@ -19,7 +19,7 @@ async function init(app, _dbPool) {
     dbPool = _dbPool;
 
     // threadAPI, get channel
-    app.post('/channel', async (req, res) => {
+    app.post(`${process.env.SERV_URL}/channel`, async (req, res) => {
         try {
             let { channelID } = req.body;
             channelID = Number(channelID);
@@ -36,7 +36,7 @@ async function init(app, _dbPool) {
     });
 
     // creates a thread and returns an updated list of threads.
-    app.post('/api-create-thread', async(req, res) => {
+    app.post(`${process.env.SERV_URL}/api-create-thread`, async(req, res) => {
         try {
             if (req.isAuthenticated() == false) { 
                 res.status(500).send();
@@ -70,7 +70,7 @@ async function init(app, _dbPool) {
     });
     
     // return the messages from the desired thread
-    app.post('/channel/threads', async (req, res) => {
+    app.post(`${process.env.SERV_URL}/channel/threads`, async (req, res) => {
         try {
             if (req.isAuthenticated() == false) { 
                 res.status(500).send();
@@ -82,7 +82,7 @@ async function init(app, _dbPool) {
         }
     })
 
-    app.post('/api-update-username', async(req, res) => {
+    app.post(`${process.env.SERV_URL}/api-update-username`, async(req, res) => {
         if (!req.isAuthenticated()) {
             return;
         }
@@ -111,7 +111,33 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-username-taken', async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-update-user-email`, async(req,res) => {
+        if (!req.isAuthenticated()) {
+            return;
+        }
+        try {
+            const newEmail = req.body.email;
+            if (newEmail == undefined || typeof(newEmail) != "string") {
+                return res.status(400).send()
+            }
+
+            const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            const userID = user.id;
+            const updateRes = await dbUtils.updateUserEmail(dbPool, newEmail, userID);
+            if (updateRes == 'err') {
+                return res.status(500).send();
+            }
+            if (updateRes == 'taken') {
+                return res.status(409).send(); // https://stackoverflow.com/questions/12657493/what-http-error-code-to-return-for-name-already-taken
+            }
+            return res.status(200).send();
+        } catch (err) {
+            console.error("API FAIL: ", err);
+            return res.status(500).send();
+        }
+    });
+
+    app.post(`${process.env.SERV_URL}/api-username-taken`, async(req,res) => {
         try {
             if (req.body == undefined || req.body.username == undefined) {
                 return req.status(400).send()
@@ -129,7 +155,7 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-update-user-muted-channel', async(req, res) => {
+    app.post(`${process.env.SERV_URL}/api-update-user-muted-channel`, async(req, res) => {
         if (!req.isAuthenticated()) {
             return req.status(401).send();
         }
@@ -154,7 +180,7 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-get-user-muted-channels', async(req, res) => {
+    app.post(`${process.env.SERV_URL}/api-get-user-muted-channels`, async(req, res) => {
         if (!req.isAuthenticated()) {
             return req.status(401).send();
         }
@@ -170,7 +196,7 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-update-user-description', async(req, res) => {
+    app.post(`${process.env.SERV_URL}/api-update-user-description`, async(req, res) => {
         if (!req.isAuthenticated()) {
             return req.status(401).send();
         }
@@ -193,7 +219,7 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-update-user-country-code', async(req, res) => {
+    app.post(`${process.env.SERV_URL}/api-update-user-country-code`, async(req, res) => {
         if (!req.isAuthenticated()) {
             return req.status(401).send();
         }
@@ -217,7 +243,7 @@ async function init(app, _dbPool) {
     });
 
     // get message chunk
-    app.post('/api-get-message-chunk-from-thread', async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-get-message-chunk-from-thread`, async(req,res) => {
         try {
             const body = req.body;
             
@@ -234,7 +260,7 @@ async function init(app, _dbPool) {
     });
 
     // get all messages
-    app.post('/api-get-messages-from-thread', async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-get-messages-from-thread`, async(req,res) => {
         try {
             const body = req.body;
             
@@ -250,7 +276,7 @@ async function init(app, _dbPool) {
         return;
     });
 
-    app.post('/api-get-thread-message-count', async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-get-thread-message-count`, async(req,res) => {
         try {
             const body = req.body;
             
@@ -263,7 +289,33 @@ async function init(app, _dbPool) {
         return;
     });
 
-    app.post('/api-delete-thread', async(req,res) => {
+    
+    // threadID should be null to remove a pinned thread
+    app.post(`${process.env.SERV_URL}/set-pinned-thread-of-channel`, async(req,res) => {
+        try {
+            if (req.isAuthenticated() == false) {
+                return res.status(401).send();
+            }
+            if (req.user == undefined) {
+                return res.status(400).send();
+            }
+
+            const privUser = await dbUtils.getUserByUsername(dbPool, req.user.username);
+            if (privUser.isAdmin == false ){
+                return res.status(401).send();
+            }
+
+            const body = req.body;
+            const count = await dbUtils.setPinnedThreadOfChannel(dbPool, body.channelID, body.threadID);
+            res.status(200).json({count: count}).send();
+        } catch (err) {
+            console.error("Failed to pin thread: ", err);
+            res.status(500).send();
+        }
+        return;
+    });
+
+    app.post(`${process.env.SERV_URL}/api-delete-thread`, async(req,res) => {
         try {
             if (req.isAuthenticated() == false) {
                 return res.status(401).send();
@@ -283,7 +335,8 @@ async function init(app, _dbPool) {
                     const user = await dbUtils.getUserByUsername(dbPool, req.user.username);
                     const userID = user.id;
                     // make sure that the user actually owns the thread before deleting it
-                    if (th.ownerID != userID) {
+                    // if the user is an admin they can delet it regardless of ownership state
+                    if (th.ownerID != userID && userID.isAdmin == false) {
                         return res.status(401).send();
                     }
                     await dbUtils.deleteThread(dbPool, body.channelID, body.threadID);
@@ -298,7 +351,7 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-update-pfp', async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-update-pfp`, async(req,res) => {
         try {
             const __dirname = path.dirname(fileURLToPath(import.meta.url));
             if (req.isAuthenticated() == false) {
@@ -377,7 +430,7 @@ async function init(app, _dbPool) {
         }
     });
 
-    app.post('/api-get-unread-pings',  async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-get-unread-pings`,  async(req,res) => {
         try {
             if (req.isAuthenticated() == false) {
                 return res.status(401).send();
@@ -393,7 +446,7 @@ async function init(app, _dbPool) {
     });
 
     // expects a ping obj in the request body
-    app.post('/api-add-unread-ping',  async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-add-unread-ping`,  async(req,res) => {
         try {
             if (req.isAuthenticated() == false) {
                 return res.status(401).send();
@@ -415,7 +468,7 @@ async function init(app, _dbPool) {
     });
 
     //removeUnreadPingsOfUserFromThread
-    app.post('/api-remove-unread-pings-of-user-from-thread', async(req,res) => {
+    app.post(`${process.env.SERV_URL}/api-remove-unread-pings-of-user-from-thread`, async(req,res) => {
         try {
             if (req.isAuthenticated() == false) {
                 return res.status(401).send();

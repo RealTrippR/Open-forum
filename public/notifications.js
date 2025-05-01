@@ -9,7 +9,7 @@ webPageOpen = true;
 async function getMutedChannelsFromServer() {
     
     try {
-        res = await fetch('/api-get-user-muted-channels', {
+        res = await fetch(`${window.baseURL}/api-get-user-muted-channels`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -42,7 +42,7 @@ async function updateMutedChannel(channelID, muted) {
     if (channelID == undefined) {throw new Error("Cannot updated muted channel, muted is undefined")}
 
     try {
-        fetch('/api-update-user-muted-channel', {
+        fetch(`${window.baseURL}/api-update-user-muted-channel`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -64,8 +64,6 @@ async function updateMutedChannel(channelID, muted) {
 
 function addUnreadPing(pingObj) {
     window.user.unreadPings.push(pingObj);
-
-    // tell server
 }
 
 function removeUnreadPingsFromThread(channelID, threadID) {
@@ -97,7 +95,7 @@ function removeUnreadPingsFromThread(channelID, threadID) {
 
     if (oldSize != window.user.unreadPings) { // to avoid wasting bandwidth first check if the unreadPings array has changed
         // tell server to remove unread pings
-        fetch('/api-remove-unread-pings-of-user-from-thread',
+        fetch(`${window.baseURL}/api-remove-unread-pings-of-user-from-thread`,
         {
             method: 'POST',
             headers: {
@@ -114,10 +112,9 @@ function attachPingToThread(channelID, threadID, pingObj) {
 
     addUnreadPing(pingObj);
 
-    // a threrad is already open, only add it to the thread
-    if (window.currentChannel.id == channelID && window.getCurrentThreadID() != threadID) {
-    } else {
-        //addUnreadPing(pingObj);
+    // it's targeting the current thread, ignore
+    if (window.currentChannel.id == channelID && window.getCurrentThreadID() == threadID) {
+        return;
     }
 
     const channelPingCount = (window.user.unreadPings.filter((ping) => (ping.channelID == channelID))).length;
@@ -143,7 +140,6 @@ function attachPingToThread(channelID, threadID, pingObj) {
         for (let thh of threadHeaderUL.children) {
 
             const thhThreadID = Number(thh.dataset.threadID);
-            console.log('tth',thhThreadID)
 
             const unreadPingCountForTargetThread = (window.user.unreadPings.filter((ping) => (ping.channelID == window.currentChannel.id && thhThreadID == threadID))).length;
             
@@ -157,7 +153,7 @@ function attachPingToThread(channelID, threadID, pingObj) {
 }
 
 function playPingSound() {
-    const pingSound = new Audio('/audio/notice.mp3'); // Adjust path as needed
+    const pingSound = new Audio(`${window.baseURL}/audio/notice.mp3`);
     pingSound.volume = 1;
     pingSound.play();
 }
@@ -191,7 +187,15 @@ function recievePingFromServer(req) {
 
                 //  && req.channelID == window.currentChannel.id
                 if (req.threadID == getCurrentThreadID()) {
-
+                    // tell server to remove unread pings
+                    fetch(`${window.baseURL}/api-remove-unread-pings-of-user-from-thread`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ channelID, threadID })
+                        });
                     return; // the thread is currently open, play the sound but don't add it to the channels
                 }
             }

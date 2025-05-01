@@ -1,6 +1,6 @@
 // sends get request to server
 async function getThreadsFromServer(channelID) {
-    const getThreadsURL = '/channel'
+    const getThreadsURL = `${window.baseURL}/channel`
 
     const res = await fetch(
         getThreadsURL,
@@ -18,6 +18,32 @@ async function getThreadsFromServer(channelID) {
     return channel.threads;
 }
 
+function createChannelNameHeader() {
+     // initialize the name bar
+     let channelNameHeader = document.getElementById('channelNameHeader');
+
+     if (channelNameHeader.children.length > 0) {
+        return;
+     }
+     // create channel name and channel desc
+     const channelName = document.createElement('p');
+     channelNameHeader.appendChild(channelName);
+     channelName.className = 'stdText';
+     channelName.style.fontWeight = '600';
+     channelName.style.fontSize = '23px';
+     channelName.style.margin = 'margin: auto 0px';
+     channelName.style.marginTop = '4px'
+     channelName.style.paddingLeft = '5px'
+     channelName.style.textAlign = 'left';
+
+     const channelDescription = document.createElement('p');
+     channelNameHeader.appendChild(channelDescription);
+     channelDescription.className = 'stdText';
+     channelDescription.style.margin = 'auto 0px';
+     channelDescription.style.fontSize = '17px';
+     channelDescription.style.paddingLeft = '15px';
+     channelDescription.style.textAlign = 'left';
+}
 async function setCurrentChannel(channel, loadHTML = true) {
 
     let channelBarHandleButtons = document.getElementsByClassName("channelBarHandleButton");
@@ -30,7 +56,13 @@ async function setCurrentChannel(channel, loadHTML = true) {
             } 
         }
     }
-
+    
+    const threadHeaderRightClickBox = document.getElementById('thread-right-click-box');
+    threadHeaderRightClickBox.style.display = 'none'
+    const chatTypeDiv = document.getElementById('chatTypeDiv');
+    // hide chatbox
+    chatTypeDiv.style.display = 'none';
+     
     window.currentChannel = channel;
 
     window.setCurrentThreadID(undefined);
@@ -39,7 +71,7 @@ async function setCurrentChannel(channel, loadHTML = true) {
     
     if (window.threadID !=undefined) {state.threadID = window.threadID};
 
-    window.history.pushState(state, '', `/channels/${channel.id}`);
+    window.history.pushState(state, '', `${window.baseURL}/channels/${channel.id}`);
 
     window.currentChannel.threads = await getThreadsFromServer(window.currentChannel.id);
 
@@ -58,36 +90,34 @@ async function setCurrentChannel(channel, loadHTML = true) {
             // initialize the name bar
             let channelNameHeader = document.getElementById('channelNameHeader');
             channelNameHeader.style.height = `${document.getElementById('channelBarHeader').offsetHeight - 1}px`;
-            let HTML = `<p class='stdText' style='font-weight: 600; font-size: 23px; margin: auto 0px; padding-left: 5px; text-align: left; '>${window.currentChannel.name}</p>`;
-            HTML += `<p class='stdText' style='margin: auto 0px; font-size: 17px; padding-left: 15px; text-align: left;'> ${channel.description}</p>`
-            //HTML += `<button style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="button" name="createThread"> Create Thread </button>`
-            //HTML += `<input style='float: right; margin-left: auto; padding-right: 15px; font-size: 17px;' type="text" placeholder="Search Threads"></input>`
-            channelNameHeader.innerHTML = HTML;
-            
+
+            if (channelNameHeader.children.length == 0) {
+                createChannelNameHeader();
+            }   
+            channelNameHeader.children[0].innerText = window.currentChannel.name;
+            channelNameHeader.children[1].innerText = channel.description;
         }
         
         await loadThreads(window.currentChannel.threads);
 
-        const msgChatBox = document.getElementById('chatTypeDiv')
-        // hide message chat box
-        msgChatBox.style.display = 'none';
-
-
         // make the thread info holder visible
         const channelInfoHolder = document.getElementById('channelInfoBarHolder');
         channelInfoHolder.style.display = 'flex';
+      
     }
 }
 
 function setCurrentChannelFromButton() {
     const li = event.currentTarget; // The clicked <li> element
-    setCurrentChannel({id: Number(li.dataset.channelId), name: li.dataset.channelName, description: li.dataset.channelDescription});
+    const channel = window.channels[li.dataset.channelId-1];
+    //setCurrentChannel({id: Number(li.dataset.channelId), name: li.dataset.channelName, description: li.dataset.channelDescription, window.cha});
+    setCurrentChannel(channel);
 }
 
 async function loadChannelBar() {
 
     let mutedChannelIDs = [];
-    if (window.user != undefined) {
+    if (window.user != undefined && window.user.loggedIn) {
         mutedChannelIDs = await getMutedChannelsFromServer();
         window.user.mutedChannelIDs = mutedChannelIDs;
         console.log('muted channels: ', mutedChannelIDs)
@@ -126,7 +156,7 @@ async function loadChannelBar() {
 
         {
             const notisEnabledImg = document.createElement('img');
-            notisEnabledImg.src = '/icons/notis.png';
+            notisEnabledImg.src = `${window.baseURL}/icons/notis.png`;
             notisEnabledImg.width = '20';
             notisEnabledImg.height = '20';
             notisEnabledImg.style.border = 'var(--stdBorder)';
@@ -137,7 +167,7 @@ async function loadChannelBar() {
 
             if (mutedChannelIDs.includes(channel.id)) {
                 // disable notifications
-                notisEnabledImg.src = '/icons/notisDisabled.png'
+                notisEnabledImg.src = `${window.baseURL}/icons/notisDisabled.png`
                 notisEnabledImg.style.boxShadow = 'var(--stdInsetMinorShadow),var(--stdMinorShadow)'
                 notisEnabledImg.style.objectPosition = '1px 1px'; // shift image content
             }
@@ -147,16 +177,16 @@ async function loadChannelBar() {
             notisEnabledImg.addEventListener('click', (event)=>{
                 const trg = event.target;
                 event.stopPropagation();
-                if (trg.src.includes('/icons/notis.png')) {
+                if (trg.src.includes(`${window.baseURL}/icons/notis.png`)) {
                     // disable notifications
-                    trg.src = '/icons/notisDisabled.png'
+                    trg.src = `${window.baseURL}/icons/notisDisabled.png`
                     trg.style.boxShadow = 'var(--stdInsetMinorShadow),var(--stdMinorShadow)'
                     trg.style.objectPosition = '1px 1px'; // shift image content
                     updateMutedChannel(channel.id, true);
                     return;
                 } else {
                     // enable notifications
-                    trg.src = '/icons/notis.png'
+                    trg.src = `${window.baseURL}/icons/notis.png`
                     trg.style.boxShadow = 'var(--stdMinorShadow)'
                     trg.style.objectPosition = '0px'; // shift image content
                     updateMutedChannel(channel.id, false);
