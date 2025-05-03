@@ -154,7 +154,7 @@ async function loadChannelBar() {
 
         li.appendChild(p);
 
-        {
+        if (window.user != undefined && window.loggedIn == true) {
             const notisEnabledImg = document.createElement('img');
             notisEnabledImg.src = `${window.baseURL}/icons/notis.png`;
             notisEnabledImg.width = '20';

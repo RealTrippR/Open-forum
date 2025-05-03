@@ -283,10 +283,10 @@ async function createMessageTableForThread(dbPool, channelID, threadID) {
     // message table
     const createTableQuery = `CREATE TABLE IF NOT EXISTS ${msgTable} (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        ownerID INT,
+        ownerID INT NOT NULL,
         content VARCHAR(4096),
         isReplyTo INT DEFAULT NULL,
-        date DATETIME,
+        date DATETIME NOT NULL,
         hasImg TINYINT(1) DEFAULT 0,
         imgExt VARCHAR(4) DEFAULT NULL
     )

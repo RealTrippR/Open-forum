@@ -225,6 +225,14 @@ document.addEventListener("visibilitychange", () => {
     if (document.visibilityState == 'hidden') {       
         webPageOpen = false;
     } else {
+
         webPageOpen = true;
+
+        // when a user comes page to this page, set the notifications for the current thread (if there is one) as read.
+        if (window.currentChannel != undefined && window.currentChannel != null) {
+            if (getCurrentThreadID() != undefined && getCurrentThreadID() != null) {
+                removeUnreadPingsFromThread(window.currentChannel.id, getCurrentThreadID());
+            }
+        }
     }
 })
