@@ -45,26 +45,8 @@ initialize(
     passport
 );
 
-if (process.env.NODE_ENV != 'production') {
-    ///await dbUtils.clearDB(dbPool, false, true, false);
-}
 await dbUtils.initDB(dbPool)
 await dbUtils.initChannels(dbPool); // creates the channels if they don't exist
-
-if (process.env.NODE_ENV != 'production') {
-    const channels = await dbUtils.getChannels(dbPool);
-    const trgC = 0;
-    // await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread No. 1", "A thead for testing purposes", channels[trgC].id)
-    // await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread No. 2", "A thead for testing purposes", channels[trgC].id)
-    // await dbUtils.addThreadToChannel(dbPool, 1, "Welcome", "A thead for testing purposes", channels[trgC].id, true)
-    // await dbUtils.addThreadToChannel(dbPool, 1, "Test Thread No. 4", "A thead for testing purposes", channels[trgC].id)
-    // await dbUtils.setPinnedThreadOfChannel(dbPool, 1, 3);
-    // await dbUtils.setUserAdminState(dbPool, 1, true)
-
-    for (let i = 0; i < 300; ++i) {
-       // await dbUtils.addMessageToThread(dbPool, 1, 1, 1, `Message: ${i+1}`)
-    }
-}
 
 import router from '../Routers/router.js'
 await router.init(app,dbOptions,dbPool, passport, io);
