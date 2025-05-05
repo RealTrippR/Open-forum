@@ -6,4 +6,4 @@ OpenForum is a lightweight, real-time, open-source chat forum designed intended 
 
 <HR>
 
-![image](https://github.com/user-attachments/assets/6f259e9b-67b8-4a2d-bc4d-c4dddcc1ae2f)
+![image](https://github.com/user-attachments/assets/9a42af42-6571-44af-a09b-38a9c4f56a81)
